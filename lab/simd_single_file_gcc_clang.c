@@ -1,5 +1,17 @@
-// Trying to figure out the best way to do SIMD in my setup.
-// I think something like this should work for every compiler except msvc.
+// This works with gcc and clang on linux and macos.
+// It also works with mingw64 on windows.
+// It however does not work with windows clang and msvc.
+// With the windows c runtime library, the intrinsice headers check for stuff like __AVX2__
+// so you can't compile this without passing the flag `-mavx2` or `/arch:AVX2`.
+// If you pass those flags, the whole thing will get compiled in that mode so any auto-vectorization
+// that happens could use those instructions and if called from a different platform would crash.
+// This means the only way to get this to work on windows is to put the implementations in separate
+// compilation units and compile those each with the correct flags, they could then be linked into
+// the main program.
+// That's annoying, because it means you need separate files for each instruction set and a more complicated
+// build to compile them each correctly and link them together.
+// Learned this from o1 btw which is pretty cool. https://chatgpt.com/share/679938fe-7520-800d-813f-9db72462b344
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
