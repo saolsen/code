@@ -219,7 +219,7 @@ void arena_clone(Arena *dest, Arena *src);
 //     eg: typedef Slice(uint8_t) uint8_tSlice;
 #define Slice(T)                                                                                   \
     struct {                                                                                       \
-        uint64_t len;                                                                                   \
+        uint64_t len;                                                                              \
         T *e;                                                                                      \
     }
 
@@ -241,7 +241,8 @@ typedef struct {
 
 #define arena_clone_slice(arena, slice)                                                            \
     {.len = (slice).len,                                                                           \
-     .e = (__typeof__((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice), sizeof(*((slice).e)))}
+     .e = (__typeof__((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice),                    \
+                                                    sizeof(*((slice).e)))}
 uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size);
 
 // Array
@@ -259,8 +260,8 @@ uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size);
 // * Since the type is polymorphic, most of the helper functions are macros.
 #define Array(T)                                                                                   \
     struct {                                                                                       \
-        uint64_t len;                                                                                   \
-        uint64_t cap;                                                                                   \
+        uint64_t len;                                                                              \
+        uint64_t cap;                                                                              \
         T e[];                                                                                     \
     }
 
@@ -301,10 +302,10 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint6
     do {                                                                                           \
         Arena *_arena = (arena);                                                                   \
         __typeof__(array) _array = (array);                                                        \
-        size_t _n = (n);                                                                             \
+        size_t _n = (n);                                                                           \
         if (!_array || _array->len + _n > _array->cap) {                                           \
             _array = (__typeof__(_array))arena__grow_array(_arena, (U8Array *)_array,              \
-                                                       sizeof(_array->e[0]), _n);                  \
+                                                           sizeof(_array->e[0]), _n);              \
             (array) = _array;                                                                      \
         }                                                                                          \
     } while (0)
