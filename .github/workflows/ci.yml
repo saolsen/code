@@ -52,7 +52,7 @@ jobs:
       - name: Configure CMake
         working-directory: cmake
         run: |
-          cmake -S . -B cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }} -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_C_STANDARD=${{ matrix.c_standard }}
+          cmake -S . -G Ninja -B cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }} -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_C_STANDARD=${{ matrix.c_standard }}
 
       - name: Build with CMake
         working-directory: cmake
