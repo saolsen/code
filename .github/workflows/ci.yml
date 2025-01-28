@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (clang-format, clang-tidy)
+        run: sudo apt-get install -y clang-format clang-tidy
+
+      - name: Run clang-format
+        run: clang-format -i test_steve.c
+        continue-on-error: true
+
+      - name: Check for changes
+        run: git diff --exit-code
+
+      - name: Run clang-tidy
+        run: clang-tidy test_steve.c -- -std=c11 -Wall -Wextra -Werror -Wconversion
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang, cl, gcc]
+        c_standard: [c11, c17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (clang)
+        if: matrix.compiler == 'clang'
+        shell: powershell
+        run: choco install llvm -y
+
+      - name: Deps (msvc)
+        if: matrix.compiler == 'cl'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc'
+        shell: powershell
+        run: choco install mingw --version=8.1.0 -y
+
+      - name: Configure CMake
+        working-directory: cmake
+        run: |
+          cmake -S . -B cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }} -G "NMake Makefiles" -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_C_STANDARD=${{ matrix.c_standard }}
+
+      - name: Build with CMake
+        working-directory: cmake
+        run: cmake --build cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }}
+
+      - name: Run tests
+        working-directory: cmake
+        run: cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }}\test_steve.exe
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang, gcc-14]
+        c_standard: [c11, c17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc-14'
+        run: |
+          brew install -q gcc
+
+      - name: Configure CMake
+        working-directory: cmake
+        run: |
+          cmake -S . -B cmake-macos-${{ matrix.compiler }}-${{ matrix.c_standard }} -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_C_STANDARD=${{ matrix.c_standard }}
+
+      - name: Build with CMake
+        working-directory: cmake
+        run: cmake --build cmake-macos-${{ matrix.compiler }}-${{ matrix.c_standard }}
+
+      - name: Run tests
+        working-directory: cmake
+        run: ./cmake-macos-${{ matrix.compiler }}-${{ matrix.c_standard }}/test_steve
+
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang, gcc]
+        c_standard: [c11, c17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (clang)
+        if: matrix.compiler == 'clang'
+        run: |
+          sudo apt-get install -y clang
+
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc'
+        run: |
+          sudo apt-get install -y gcc
+
+      - name: Configure CMake
+        working-directory: cmake
+        run: |
+          cmake -S . -B cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }} -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_C_STANDARD=${{ matrix.c_standard }}
+
+      - name: Build with CMake
+        working-directory: cmake
+        run: cmake --build cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }}
+
+      - name: Run tests
+        working-directory: build/cmake
+        run: ./cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }}/test_steve
