@@ -9,7 +9,7 @@ add_executable(test_steve ../test_steve.c)
 if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_steve PRIVATE -Wall -Wextra -Werror -Wconversion)
 elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(test_steve PRIVATE /W4 /WX)
+    target_compile_options(test_steve PRIVATE /TC /W4 /WX)
 endif()
 
 # Enable AddressSanitizer in debug mode when using Clang
