@@ -1,7 +1,7 @@
-// This works with gcc and clang on linux and macos.
+// This works with gcc and clang on linux and macOS.
 // It also works with mingw64 on windows.
 // It however does not work with windows clang and msvc.
-// With the windows c runtime library, the intrinsice headers check for stuff like __AVX2__
+// With the windows c runtime library, the intrinsic headers check for stuff like __AVX2__
 // so you can't compile this without passing the flag `-mavx2` or `/arch:AVX2`.
 // If you pass those flags, the whole thing will get compiled in that mode so any auto-vectorization
 // that happens could use those instructions and if called from a different platform would crash.
@@ -97,7 +97,7 @@ static bool has_avx2(void) {
 
 #if defined(__ARM_NEON) || defined(__aarch64__)
 static bool has_neon(void) {
-    return true;  // NEON is always available on ARM (for the 64 bit platforms we care about).
+    return true;  // NEON is always available on ARM (for the 64-bit platforms we care about).
 }
 #endif
 
