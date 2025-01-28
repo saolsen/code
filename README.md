@@ -30,7 +30,7 @@ It provides the following
 * A "standard" slice type to pass around views of arrays.
 * Some string utilities that operate on `String`, which is a slice of characters.
 
-### steve.h TODO
+### steve.h Future Ideas
 * A hash table.
 * A pool.
 * A string intern table.
@@ -38,3 +38,14 @@ It provides the following
 ## dandd.c
 
 Dungeons and Diagrams solver and puzzle generator.
+
+# Future Ideas
+
+* It should be really easy to add support for raylib and CLAY (though no clay on msvc).
+* I might want to bring in the unity testing library, seems pretty great and would make writing tests easier.
+* I'd like some "release build" support where I can build downloadable artifacts of apps. They should properly 
+  package stuff the right way for each platform (for example, a DMG on macOS) and include resources and helpers to write 
+  to the right user data locations. (See the SDL code for where those places are).
+* I'll probably want to do some metaprogramming at some point, especially for SIMD stuff, and I'll need a good way to
+  fit that kind of workflow into this build setup.
+* 
