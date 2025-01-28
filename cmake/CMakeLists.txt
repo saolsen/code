@@ -39,7 +39,10 @@ target_link_libraries(dandd compile-options)
 add_test(NAME dandd COMMAND dandd)
 
 # Stuff in lab doesn't necessarily work on all platforms or even compile.
-if (NOT CMAKE_C_COMPILER_ID MATCHES "MSVC")
+if (NOT (
+  (CMAKE_C_COMPILER_ID MATCHES "MSVC") OR
+  (CMAKE_SYSTEM_NAME MATCHES "Windows" AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+))
     add_executable(simd ../lab/simd_single_file_gcc_clang.c)
     target_link_libraries(simd compile-options)
     add_test(NAME simd COMMAND simd)
