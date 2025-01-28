@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [clang, cl, gcc]
-        c_standard: [c11, c17]
+        c_standard: [11, 17]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -68,7 +68,7 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [clang, gcc-14]
-        c_standard: [c11, c17]
+        c_standard: [11, 17]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -97,7 +97,7 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [clang, gcc]
-        c_standard: [c11, c17]
+        c_standard: [11, 17]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
