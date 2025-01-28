@@ -1,5 +1,4 @@
 # Code
-
 This is a "mono-repo" for various c code. Created because I got sick of setting up new projects.
 It unfortunately uses CMake, because it's the best build system for CLion, my ide of choice.
 The code should run under windows/linux/mac under gcc/clang/msvc and c11 or c17. Those platforms are all tested in CI.
@@ -7,7 +6,6 @@ The code also only supports 64bit platforms, I depend on that for my Arena imple
 large virtual allocations to get contiguous blocks of memory.
 
 ## steve.h
-
 This is my general purpose c helper library. It's heavily inspired by the stb libraries, and contains a bunch of
 useful data structures and utilities I use accross projects. It's a single header file that includes both the
 implementation and the interface. To use it include `steve.h` in any files that use it and define `STEVE_IMPLEMENTATION`
@@ -34,13 +32,12 @@ It provides the following
 * A hash table.
 * A pool.
 * A string intern table.
+* Debug logging utility that writes to stdout on posix and OutputDebugString on windows.
 
 ## dandd.c
-
 Dungeons and Diagrams solver and puzzle generator.
 
 # Future Ideas
-
 * It should be really easy to add support for raylib and CLAY (though no clay on msvc).
 * I might want to bring in the unity testing library, seems pretty great and would make writing tests easier.
 * I'd like some "release build" support where I can build downloadable artifacts of apps. They should properly 
