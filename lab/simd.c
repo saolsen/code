@@ -1,6 +1,5 @@
 // Trying to figure out the best way to do SIMD in my setup.
 // I think something like this should work for every compiler except msvc.
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -13,8 +12,8 @@ void process_data_base(float* data, size_t n) {
 // uh, p sure for this sse2 and ss34.1 are the same.
 // dunno if I ever need both unless I'm doing a sse4.1 only thing.
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(i386) || defined(_M_IX86)
 // SSE2 version
-#if defined(__SSE2__) || defined(__SSE4_1__) || defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <emmintrin.h>  // SSE2 headers
 
 __attribute__((target("sse2")))
@@ -26,10 +25,8 @@ void process_data_sse2(float* data, size_t n) {
         _mm_storeu_ps(&data[i], vec);
     }
 }
-#endif
 
 // SSE4.1 version
-#if defined(__SSE4_1__) || defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <smmintrin.h>  // SSE4.1 headers
 
 __attribute__((target("sse4.1")))
@@ -41,10 +38,8 @@ void process_data_sse41(float* data, size_t n) {
         _mm_storeu_ps(&data[i], vec);
     }
 }
-#endif
 
 // AVX2 version
-#if defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>  // AVX headers
 
 __attribute__((target("avx2")))
@@ -75,8 +70,6 @@ void process_data_neon(float* data, size_t n) {
 
 // CPUID check for x86 features
 #if defined(__x86_64__) || defined(_M_X64) || defined(i386) || defined(_M_IX86)
-#include <cpuid.h>
-
 static bool has_sse2(void) {
     return __builtin_cpu_supports("sse2");
 }
