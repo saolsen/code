@@ -122,5 +122,5 @@ jobs:
         run: cmake --build cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }}
 
       - name: Run tests
-        working-directory: build/cmake
+        working-directory: cmake
         run: ./cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }}/test_steve
