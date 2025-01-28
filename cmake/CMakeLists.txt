@@ -33,3 +33,7 @@ enable_testing()
 add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
+
+add_executable(dandd ../dandd.c)
+target_link_libraries(dandd compile-options)
+add_test(NAME dandd COMMAND dandd)
