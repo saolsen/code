@@ -63,7 +63,7 @@ jobs:
 
       - name: Run tests
         working-directory: cmake
-        run: cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }}\test_steve.exe
+        run: ctest --test-dir cmake-windows-${{ matrix.compiler }}-${{ matrix.c_standard }} --output-on-failure
 
   macos:
     runs-on: macos-latest
@@ -92,7 +92,7 @@ jobs:
 
       - name: Run tests
         working-directory: cmake
-        run: ./cmake-macos-${{ matrix.compiler }}-${{ matrix.c_standard }}/test_steve
+        run: ctest --test-dir cmake-macos-${{ matrix.compiler }}-${{ matrix.c_standard }} --output-on-failure
 
   linux:
     runs-on: ubuntu-24.04
@@ -126,4 +126,4 @@ jobs:
 
       - name: Run tests
         working-directory: cmake
-        run: ./cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }}/test_steve
+        run: ctest --test-dir cmake-linux-${{ matrix.compiler }}-${{ matrix.c_standard }} --output-on-failure

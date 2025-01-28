@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 project(code C)
+
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -27,5 +28,8 @@ if (
     target_link_options(compile-options INTERFACE -fsanitize=address)
 endif()
 
+enable_testing()
+
 add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
+add_test(NAME test_steve COMMAND test_steve)
