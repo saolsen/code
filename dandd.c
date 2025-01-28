@@ -486,9 +486,9 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
 
     Tile puzzle_tiles[64] = {0};
     Puzzle puzzle = {.row_wall_counts = {0, 0, 0, 0, 0, 0, 0},
-            .col_wall_counts = {0, 0, 0, 0, 0, 0, 0},
-            .monsters = 0,
-            .treasures = 0};
+                     .col_wall_counts = {0, 0, 0, 0, 0, 0, 0},
+                     .monsters = 0,
+                     .treasures = 0};
     u64 solution = 0;
     i32 slot = 0;
 
@@ -536,9 +536,9 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
             // Record it but don't increment slot, we want to backtrack and keep searching for
             // more.
             Puzzle valid_puzzle = {.row_wall_counts = {0, 0, 0, 0, 0, 0, 0},
-                    .col_wall_counts = {0, 0, 0, 0, 0, 0, 0},
-                    .monsters = puzzle.monsters,
-                    .treasures = puzzle.treasures};
+                                   .col_wall_counts = {0, 0, 0, 0, 0, 0, 0},
+                                   .monsters = puzzle.monsters,
+                                   .treasures = puzzle.treasures};
             // Calculate row and col counts.
             for (i32 i = 0; i < 8; i++) {
                 valid_puzzle.row_wall_counts[i] = (u8)count_walls_in_row(solution, i);
@@ -562,7 +562,7 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
 #endif
 
             GeneratedPuzzle gen_puzzle = {.puzzle = valid_puzzle,
-                    .num_solutions = num_valid_puzzle_solutions};
+                                          .num_solutions = num_valid_puzzle_solutions};
             if (puzzle_i < max_puzzles) {
                 puzzles[puzzle_i++] = gen_puzzle;
             } else {
@@ -582,11 +582,11 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
 
 int main(void) {
     PuzzleArgs args = {.row_wall_counts = {1, 4, 3, 2, 4, 5, 3, 3},
-            .col_wall_counts = {1, 3, 6, 2, 4, 2, 3, 4},
-            .monsters = {{.row = 7, .col = 5}},
-            .monsters_count = 1,
-            .treasures = {},
-            .treasures_count = 0};
+                       .col_wall_counts = {1, 3, 6, 2, 4, 2, 3, 4},
+                       .monsters = {{.row = 7, .col = 5}},
+                       .monsters_count = 1,
+                       .treasures = {},
+                       .treasures_count = 0};
     Puzzle p = puzzle(args);
     u64 solutions[32];
     u64 num_solutions = solve(p, solutions, 32);
