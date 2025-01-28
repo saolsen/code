@@ -15,14 +15,16 @@ jobs:
         run: sudo apt-get install -y clang-format clang-tidy
 
       - name: Run clang-format
-        run: clang-format -i test_steve.c
+        run: clang-format -i steve.h test_steve.c dandd.c
         continue-on-error: true
 
       - name: Check for changes
         run: git diff --exit-code
 
       - name: Run clang-tidy
-        run: clang-tidy test_steve.c -- -std=c11 -Wall -Wextra -Werror -Wconversion
+        run: |
+          clang-tidy test_steve.c -- -std=c11 -Wall -Wextra -Werror -Wconversion
+          clang-tidy dandd.c -- -std=c11 -Wall -Wextra -Werror -Wconversion
 
   windows:
     runs-on: windows-latest
