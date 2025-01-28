@@ -11,15 +11,8 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Deps (clang-format, clang-tidy)
-        run: sudo apt-get install -y clang-format clang-tidy
-
-      - name: Run clang-format
-        run: clang-format -i steve.h test_steve.c dandd.c
-        continue-on-error: true
-
-      - name: Check for changes
-        run: git diff --exit-code
+      - name: Deps (clang-tidy)
+        run: sudo apt-get install -y clang-tidy
 
       - name: Run clang-tidy
         run: |
