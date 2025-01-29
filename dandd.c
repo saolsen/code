@@ -471,6 +471,21 @@ typedef struct {
     u64 num_solutions;
 } GeneratedPuzzle;
 
+// This is a very bad hash function but represents what we want.
+// Take the input seed and map it to some other number such
+// that two inputs that are close together turn into two outputs
+// that are not close together. That gives the perception of randomness
+// and two similar seed numbers don't result in similar puzzles.
+__uint128_t hash(__uint128_t x) {
+    uint64_t a = (uint64_t)(x >> 64);
+    uint64_t b = (uint64_t)x;
+    a = (a << 31) ^ b;
+    b = (b >> 31) ^ a;
+    return ((__uint128_t)a << 64) | b;
+}
+
+typedef enum { EMPTY = 0, WALL = 1, MONSTER = 2, TREASURE = 3 } Tile;
+
 // Generate valid puzzles.
 // Pushes all found puzzles into the passed in `puzzles` pointer which is assumed to
 // be an empty array with length max_puzzles.
@@ -480,8 +495,9 @@ typedef struct {
 // The row and col counts are simply derived from a valid puzzle.
 // This means there are 4^64 elements in puzzle space, which is much larger than the solution space
 // for a specific puzzle, though obviously most of them are not valid.
-u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
-    typedef enum { EMPTY = 0, WALL = 1, MONSTER = 2, TREASURE = 3 } Tile;
+// Pass in a pointer to a seed to generate a specific puzzle, or NULL to search from
+// an empty grid.
+u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles, __uint128_t *seed) {
     u64 puzzle_i = 0;
 
     Tile puzzle_tiles[64] = {0};
@@ -491,6 +507,32 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
                      .treasures = 0};
     u64 solution = 0;
     i32 slot = 0;
+
+    if (seed != NULL) {
+        __uint128_t n = hash(*seed);
+        for (i32 i = 0; i < 64; i++) {
+            // Look at the bits 3 at a time and convert them to a tile.
+            Tile t = (Tile)((n >> (i * 2)) & 3);
+            if (i == 63) {
+                t = (t + 1) % 4;
+            }
+            puzzle_tiles[i] = t;
+            switch (puzzle_tiles[i]) {
+                case TREASURE: {
+                    puzzle.treasures = slot_set(puzzle.treasures, i);
+                } break;
+                case MONSTER: {
+                    puzzle.monsters = slot_set(puzzle.monsters, i);
+                } break;
+                case WALL: {
+                    solution = slot_set(solution, i);
+                } break;
+                case EMPTY: {
+                } break;
+            }
+        }
+        slot = 63;
+    }
 
     while (0 <= slot && slot < 64) {
         // Undo previous tile and choose next option.
@@ -580,17 +622,6 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
     return puzzle_i;
 }
 
-// Ideas on puzzle generation based on a seed.
-// There are 4^64 possible board states. That's a number that fits in 128 bits.
-// To do seeded generation you could map a number into that range and then search for the next possible puzzle.
-// You get a lot of seed "collisions" where two different seeds map to the same puzzle, but if you do a pseudo-random
-// mapping then those collisions are spread out, and it's "good enough". You get a fast number->puzzle mapping that way.
-typedef struct {
-    u64 a;
-    u64 b;
-    __uint128_t c;
-} Seed;
-
 int main(void) {
     PuzzleArgs args = {.row_wall_counts = {1, 4, 3, 2, 4, 5, 3, 3},
                        .col_wall_counts = {1, 3, 6, 2, 4, 2, 3, 4},
@@ -612,7 +643,7 @@ int main(void) {
     // @note(steve): There are a TON of puzzles. I haven't tried counting them all I suspect it'd
     // take a long time.
     GeneratedPuzzle puzzles[8];
-    u64 num_puzzles = generate(puzzles, 8);
+    u64 num_puzzles = generate(puzzles, 8, NULL);
     printf("Num generated puzzles: %" PRIu64 "\n\n", num_puzzles);
     for (u64 i = 0; i < num_puzzles; i++) {
         printf("Puzzle: %" PRIu64 "\n", i);
@@ -620,5 +651,20 @@ int main(void) {
         print_puzzle(puzzles[i].puzzle, 0);
         printf("\n");
     }
-}
 
+    printf("\nSeeded Generation\n");
+    GeneratedPuzzle seed_result;
+    __uint128_t seed;
+
+    seed = 844674407370954;
+    printf("Seed: 0x%016" PRIx64 "%016" PRIx64 "\n", (uint64_t)(seed >> 64),
+           (uint64_t)(seed & 0xFFFFFFFFFFFFFFFF));
+    generate(&seed_result, 1, &seed);
+    print_puzzle(seed_result.puzzle, 0);
+
+    seed = 844674407370955;
+    printf("Seed: 0x%016" PRIx64 "%016" PRIx64 "\n", (uint64_t)(seed >> 64),
+           (uint64_t)(seed & 0xFFFFFFFFFFFFFFFF));
+    generate(&seed_result, 1, &seed);
+    print_puzzle(seed_result.puzzle, 0);
+}
