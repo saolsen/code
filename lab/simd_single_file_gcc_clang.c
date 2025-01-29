@@ -127,6 +127,7 @@ int main() {
     process_data_func impl = get_best_impl();
 
     impl(data, 1024);  // Uses optimal SIMD version
+    fflush(stdout);
     assert(false);
     return 0;
 }
