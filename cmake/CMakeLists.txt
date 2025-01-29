@@ -11,7 +11,7 @@ add_library(compile-options INTERFACE)
 
 # Add common compiler warnings
 if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(compile-options INTERFACE -Wall -Wextra -Werror -Wconversion)
+    target_compile_options(compile-options INTERFACE -Wall -Wextra -Wconversion -Werror)
 elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(compile-options INTERFACE /TC /W4 /wd4200 /WX)  # c mode, disable error from flexible array member.
 endif ()
@@ -19,9 +19,7 @@ endif ()
 # Enable AddressSanitizer in debug mode when using Clang on linux or macos.
 # * On MacOS need environment variable set MallocNanoZone=0
 #   or you'll get a warning with asan in stdlib code.
-if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Windows") AND
-(CMAKE_C_COMPILER_ID STREQUAL "Clang") AND
-(CMAKE_BUILD_TYPE STREQUAL "Debug"))
+if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Windows") AND (CMAKE_C_COMPILER_ID STREQUAL "Clang") AND (CMAKE_BUILD_TYPE STREQUAL "Debug"))
     target_compile_options(compile-options INTERFACE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(compile-options INTERFACE -fsanitize=address)
 endif ()
@@ -39,16 +37,14 @@ if (NOT (CMAKE_C_COMPILER_ID STREQUAL "MSVC"))
 endif ()
 
 # Stuff in lab doesn't necessarily work on all platforms or even compile.
-
-if (NOT (
-(CMAKE_C_COMPILER_ID STREQUAL "MSVC") OR
-(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
-))
+if (NOT ((CMAKE_C_COMPILER_ID STREQUAL "MSVC") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID STREQUAL "Clang")))
     add_executable(simd ../lab/simd_single_file_gcc_clang.c)
     target_link_libraries(simd compile-options)
     add_test(NAME simd COMMAND simd)
 endif ()
 
-add_executable(bigints ../lab/bigints.c)
-target_link_libraries(bigints compile-options)
-#add_test(NAME bigints COMMAND bigints)
+if (NOT ((CMAKE_C_COMPILER_ID STREQUAL "MSVC") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID STREQUAL "Clang")))
+    add_executable(bigints ../lab/bigints.c)
+    target_link_libraries(bigints compile-options)
+    add_test(NAME bigints COMMAND bigints)
+endif ()
