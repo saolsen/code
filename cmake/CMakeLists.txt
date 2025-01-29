@@ -37,13 +37,13 @@ if (NOT (CMAKE_C_COMPILER_ID STREQUAL "MSVC"))
 endif ()
 
 # Stuff in lab doesn't necessarily work on all platforms or even compile.
-if (NOT ((CMAKE_C_COMPILER_ID STREQUAL "MSVC") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID STREQUAL "Clang")))
+if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "Clang|MSVC")))
     add_executable(simd ../lab/simd_single_file_gcc_clang.c)
     target_link_libraries(simd compile-options)
     add_test(NAME simd COMMAND simd)
 endif ()
 
-if (NOT ((CMAKE_C_COMPILER_ID STREQUAL "MSVC") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID STREQUAL "Clang")))
+if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "Clang|MSVC")))
     add_executable(bigints ../lab/bigints.c)
     target_link_libraries(bigints compile-options)
     add_test(NAME bigints COMMAND bigints)
