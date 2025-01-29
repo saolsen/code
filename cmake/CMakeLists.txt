@@ -34,9 +34,11 @@ add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
-add_executable(dandd ../dandd.c)
-target_link_libraries(dandd compile-options)
-add_test(NAME dandd COMMAND dandd)
+if (NOT CMAKE_COMPILER_ID MATCHES "MSVC")
+    add_executable(dandd ../dandd.c)
+    target_link_libraries(dandd compile-options)
+    add_test(NAME dandd COMMAND dandd)
+endif ()
 
 # Stuff in lab doesn't necessarily work on all platforms or even compile.
 
