@@ -32,7 +32,7 @@ add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
-if (NOT (CMAKE_COMPILER_ID STREQUAL "MSVC"))
+if (NOT (CMAKE_C_COMPILER_ID STREQUAL "MSVC"))
     add_executable(dandd ../dandd.c)
     target_link_libraries(dandd compile-options)
     add_test(NAME dandd COMMAND dandd)
