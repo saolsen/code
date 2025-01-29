@@ -12,12 +12,13 @@
 // build to compile them each correctly and link them together.
 // Learned this from o1 btw which is pretty cool. https://chatgpt.com/share/679938fe-7520-800d-813f-9db72462b344
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
 // Base version (no SIMD)
-void process_data_base(float* data, size_t n) {
+void process_data_base(float *data, size_t n) {
     for (size_t i = 0; i < n; i++) data[i] *= 2.0f;
 }
 
@@ -69,8 +70,10 @@ void process_data_avx2(float* data, size_t n) {
 
 // AI wrote this I have no idea if it's right.
 #ifdef __ARM_NEON
+
 #include <arm_neon.h>
-void process_data_neon(float* data, size_t n) {
+
+void process_data_neon(float *data, size_t n) {
     printf("using neon\n");
     for (size_t i = 0; i < n; i += 4) {
         float32x4_t vec = vld1q_f32(&data[i]);
@@ -78,6 +81,7 @@ void process_data_neon(float* data, size_t n) {
         vst1q_f32(&data[i], vec);
     }
 }
+
 #endif
 
 // CPUID check for x86 features
@@ -96,13 +100,15 @@ static bool has_avx2(void) {
 #endif
 
 #if defined(__ARM_NEON) || defined(__aarch64__)
+
 static bool has_neon(void) {
     return true;  // NEON is always available on ARM (for the 64-bit platforms we care about).
 }
+
 #endif
 
 // Function pointer type
-typedef void (*process_data_func)(float*, size_t);
+typedef void (*process_data_func)(float *, size_t);
 
 // Select best available implementation
 process_data_func get_best_impl(void) {
@@ -121,5 +127,6 @@ int main() {
     process_data_func impl = get_best_impl();
 
     impl(data, 1024);  // Uses optimal SIMD version
+    assert(false);
     return 0;
 }
