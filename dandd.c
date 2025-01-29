@@ -580,6 +580,17 @@ u64 generate(GeneratedPuzzle *puzzles, u64 max_puzzles) {
     return puzzle_i;
 }
 
+// Ideas on puzzle generation based on a seed.
+// There are 4^64 possible board states. That's a number that fits in 128 bits.
+// To do seeded generation you could map a number into that range and then search for the next possible puzzle.
+// You get a lot of seed "collisions" where two different seeds map to the same puzzle, but if you do a pseudo-random
+// mapping then those collisions are spread out, and it's "good enough". You get a fast number->puzzle mapping that way.
+typedef struct {
+    u64 a;
+    u64 b;
+    __uint128_t c;
+} Seed;
+
 int main(void) {
     PuzzleArgs args = {.row_wall_counts = {1, 4, 3, 2, 4, 5, 3, 3},
                        .col_wall_counts = {1, 3, 6, 2, 4, 2, 3, 4},
@@ -610,3 +621,4 @@ int main(void) {
         printf("\n");
     }
 }
+

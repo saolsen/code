@@ -11,7 +11,25 @@
 #error "Unsupported Platform"
 #endif
 
+
+
 int main(void) {
-    printf("Big Ints\n");
+    // Do 128 bit ints just work?
+    // instead of uint_8, this should be uint2_t, 00, 01, 10, 11
+    uint8_t seed[64] = {0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        0,1,2,3,0,1,2,3,
+                        };
+
+    __uint128_t a = 0x123456789abcdef0;
+
+    uint16_t seed_rows[8] = {0,1,2,3,4,5,6,7};
+
+    printf("Big Int: %lld\n", a);
     return 0;
 }
