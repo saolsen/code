@@ -30,7 +30,7 @@ add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
-add_executable(tazar ../tazar.c)
+add_executable(tazar ../tazar/tazar_main.c)
 target_link_libraries(tazar compile-options)
 add_test(NAME tazar COMMAND tazar)
 
