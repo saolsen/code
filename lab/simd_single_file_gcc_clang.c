@@ -128,6 +128,11 @@ int main() {
 
     impl(data, 1024);  // Uses optimal SIMD version
     fflush(stdout);
-    assert(false);
     return 0;
 }
+
+// Here's what the github actions runners report for this.
+// windows:  using avx2
+// macos:    using neon
+// linux:    using avx2
+// so it's possible I'd want to run stuff on sse41 or sse2 systems, but I don't actually have any of those to test on.
