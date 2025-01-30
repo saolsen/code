@@ -45,7 +45,9 @@ int cli_main(void) {
     wprintf(L"         ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱         \n");
     wprintf(L"          │ Y │ Y │ Y │ Y │ Y │          \n");
     wprintf(L"           ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱           \n");
+    wprintf(L"                                         \n");
+
 
     fflush(stdout);
-    return 1;
+    return 0;
 }
