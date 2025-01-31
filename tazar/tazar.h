@@ -33,4 +33,30 @@ DPos dpos_from_cpos(CPos cpos);
 
 CPos cpos_from_dpos(DPos dpos);
 
+typedef enum {
+    PIECE_NONE = 0,
+    PIECE_EMPTY,
+    PIECE_CROWN,
+    PIECE_PIKE,
+    PIECE_HORSE,
+    PIECE_BOW,
+} PieceKind;
+
+typedef enum {
+    PLAYER_NONE = 0,
+    PLAYER_RED,
+    PLAYER_BLUE,
+} Player;
+
+typedef struct {
+    PieceKind kind;
+    Player player;
+} Piece;
+
+typedef struct {
+    Piece board[81];
+} Game;
+
+void game_init_attrition_hex_field_small(Game *game);
+
 #endif //TAZAR_H
