@@ -21,25 +21,10 @@ int cli_set_wide_stream(FILE *stream) {
 
 #endif
 
+// todo: put some info on the right of the screen, so don't have linebreaks in buf.
+//  also but a border or something, that would be nice.
 
-int cli_main(void) {
-    setlocale(LC_ALL, "");
-    cli_set_wide_stream(stdout);
-
-    wprintf(L"Simple Tazar Bot, Playing 'ATTRITION' on 'Hex Field Small'\n");
-    wprintf(L"* You are Red, (the pieces in white). Opponent is Blue (the pieces in black).\n");
-    wprintf(L"Units: ☆ = (c)rown, □ = (p)ike, △ = (h)orse, ○ = (b)ow.\n  Refer to units by id, eg: 'p2'\n");
-    wprintf(L"Actions: (move),(volley),(charge),(end)'\n");
-    wprintf(L"Directions: (r)ight-(u)p, (r)ight, (r)ight-(d)own, (l)eft-(d)own, (l)eft, (l)eft-(u)p.'\n");
-    wprintf(L"Commands: '[UNIT] [ACTION] [TARGET PATH]'.\n");
-    wprintf(L" examples:\n");
-    wprintf(L"   'p3 move ru r'      Move pike(3) 2 tiles. Right-up, then right\n");
-    wprintf(L"   'b1 volley r r r'   Shoots a volley from bow(1) at the tile two to the right of it.\n");
-    wprintf(L"Red (you) goes first.\n");
-
-    Game game;
-    game_init(&game);
-
+void cli_game_draw(Game *game) {
     wchar_t buf[(80 * 19) + 1];
     wmemset(buf, L' ', 80 * 19);
     buf[80 * 19] = L'\0';
@@ -61,7 +46,7 @@ int cli_main(void) {
 
             DPos screen_pos = {col - screen_center.x, row - screen_center.y};
             CPos cpos = cpos_from_dpos(screen_pos);
-            Piece piece = *board_at(&game, cpos);
+            Piece piece = *board_at(game, cpos);
             if (piece.kind == PIECE_NONE) {
                 continue;
             }
@@ -112,8 +97,41 @@ int cli_main(void) {
     wprintf(L"\n");
     wprintf(L"> ");
 
-
     fflush(stdout);
+}
+
+#include <stdlib.h>
+#include "bestline.h"
+
+int cli_main(void) {
+    setlocale(LC_ALL, "");
+    cli_set_wide_stream(stdout);
+
+    wprintf(L"Simple Tazar Bot, Playing 'ATTRITION' on 'Hex Field Small'\n");
+    wprintf(L"* You are Red, (the pieces in white). Opponent is Blue (the pieces in black).\n");
+    wprintf(L"Units: ☆ = (c)rown, □ = (p)ike, △ = (h)orse, ○ = (b)ow.\n  Refer to units by id, eg: 'p2'\n");
+    wprintf(L"Actions: (move),(volley),(charge),(end)'\n");
+    wprintf(L"Directions: (r)ight-(u)p, (r)ight, (r)ight-(d)own, (l)eft-(d)own, (l)eft, (l)eft-(u)p.'\n");
+    wprintf(L"Commands: '[UNIT] [ACTION] [TARGET PATH]'.\n");
+    wprintf(L" examples:\n");
+    wprintf(L"   'p3 move ru r'      Move pike(3) 2 tiles. Right-up, then right\n");
+    wprintf(L"   'b1 volley r r r'   Shoots a volley from bow(1) at the tile two to the right of it.\n");
+    wprintf(L"Red (you) goes first.\n");
+
+    Game game;
+    game_init(&game);
+    cli_game_draw(&game);
+
+    char *line;
+    while ((line = bestlineWithHistory("IN> ", "foo"))) {
+        fputs("OUT> ", stdout);
+        fputs(line, stdout);
+        fputs("\n", stdout);
+        free(line);
+        cli_game_draw(&game);
+    }
+
+
     return 0;
 }
 

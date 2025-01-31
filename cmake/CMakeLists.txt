@@ -11,7 +11,7 @@ add_library(compile-options INTERFACE)
 
 # Add common compiler warnings
 if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(compile-options INTERFACE -Wall -Wextra -Wconversion -Werror)
+    target_compile_options(compile-options INTERFACE -Wall -Wextra -Wconversion)# -Werror)
 elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(compile-options INTERFACE /TC /W4 /wd4200 /WX)  # c mode, disable error from flexible array member.
 endif ()
@@ -31,7 +31,8 @@ target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
 add_executable(tazar ../tazar/tazar_main.c)
-target_link_libraries(tazar compile-options)
+add_library(bestline ../tazar/bestline.c)
+target_link_libraries(tazar compile-options bestline)
 add_test(NAME tazar COMMAND tazar)
 
 if (NOT (CMAKE_C_COMPILER_ID STREQUAL "MSVC"))
