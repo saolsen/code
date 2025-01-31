@@ -26,6 +26,17 @@ int cli_main(void) {
     setlocale(LC_ALL, "");
     cli_set_wide_stream(stdout);
 
+    wprintf(L"Simple Tazar Bot, Playing 'ATTRITION' on 'Hex Field Small'\n");
+    wprintf(L"* You are Red, (the pieces in white). Opponent is Blue (the pieces in black).\n");
+    wprintf(L"Units: ☆ = (c)rown, □ = (p)ike, △ = (h)orse, ○ = (b)ow.\n  Refer to units by id, eg: 'p2'\n");
+    wprintf(L"Actions: (move),(volley),(charge),(end)'\n");
+    wprintf(L"Directions: (r)ight-(u)p, (r)ight, (r)ight-(d)own, (l)eft-(d)own, (l)eft, (l)eft-(u)p.'\n");
+    wprintf(L"Commands: '[UNIT] [ACTION] [TARGET PATH]'.\n");
+    wprintf(L" examples:\n");
+    wprintf(L"   'p3 move ru r'      Move pike(3) 2 tiles. Right-up, then right\n");
+    wprintf(L"   'b1 volley r r r'   Shoots a volley from bow(1) at the tile two to the right of it.\n");
+    wprintf(L"Red (you) goes first.\n");
+
     Game game;
     game_init(&game);
 
@@ -69,29 +80,38 @@ int cli_main(void) {
 
             // Draw piece.
             wchar_t symbol;
+            wchar_t id;
             switch (piece.kind) {
                 case PIECE_CROWN:
                     symbol = piece.player == PLAYER_RED ? L'☆' : L'★';
+                    id = L'0' + piece.id;
                     break;
                 case PIECE_PIKE:
                     symbol = piece.player == PLAYER_RED ? L'□' : L'■';
+                    id = L'0' + piece.id;
                     break;
                 case PIECE_HORSE:
                     symbol = piece.player == PLAYER_RED ? L'△' : L'▲';
+                    id = L'0' + piece.id;
                     break;
                 case PIECE_BOW:
                     symbol = piece.player == PLAYER_RED ? L'○' : L'●';
+                    id = L'0' + piece.id;
                     break;
                 default:
                     symbol = L' ';
+                    id = L' ';
                     break;
             }
             buf[char_y * 80 + char_x] = symbol;
+            buf[(char_y + 1) * 80 + char_x] = id;
         }
     }
     buf[80 * 19] = L'\0';
     wprintf(L"%ls", buf);
     wprintf(L"\n");
+    wprintf(L"> ");
+
 
     fflush(stdout);
     return 0;
@@ -111,8 +131,8 @@ wprintf(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     wprintf(L" ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ \n");
     wprintf(L"│ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ C │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y |  \n");
     wprintf(L" ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ \n");
-    wprintf(L"  │ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y |\n");
-    wprintf(L" ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ \n");
+    wprintf(L"  │ X │ Y │ Y │ Y │ Y │ Y │ Y │ P │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y |\n");
+    wprintf(L" ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲1╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ \n");
     wprintf(L"│ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y |  \n");
     wprintf(L" ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ \n");
     wprintf(L"  │ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ X │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y │ Y |\n");
@@ -135,9 +155,16 @@ wprintf(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     wprintf(L"     ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱     \n");
     wprintf(L"      │ Y │ Y │ Y │ Y │ Y │ Y │ Y │      \n");
     wprintf(L"       ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱       \n");
-    wprintf(L"        │ Y │ Y │ Y │ Y │ Y │ Y │        \n");
+    wprintf(L"        │ Y │ Y │ Y │ Y │ Y │RB4│        \n");
     wprintf(L"         ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱         \n");
-    wprintf(L"          │ Y │ Y │ Y │ Y │ Y │          \n");
-    wprintf(L"           ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱           \n");
+    wprintf(L"          │ ■ │ Y │RC1│ ■ │BP3│          \n");
+    wprintf(L"           ╲1╱ ╲ ╱ ╲ ╱ ╲5╱ ╲ ╱           \n");
     wprintf(L"                                         \n");
 #endif
+
+// P1 MOVE R R UR
+// H1 CHARGE L L L
+//
+//P1 R R UR
+
+// P1 MOVE R R UR DL L UR DR R

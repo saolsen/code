@@ -51,6 +51,7 @@ typedef enum {
 typedef struct {
     PieceKind kind;
     Player player;
+    int id;
 } Piece;
 
 typedef struct {

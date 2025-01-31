@@ -21,6 +21,7 @@ CPos cpos_add(CPos a, CPos b) {
 static Piece piece_null = (Piece) {
         .kind = PIECE_NONE,
         .player = PLAYER_NONE,
+        .id = 0,
 };
 
 // @note: Hardcoded to game mode "ATTRITION" and map "Hex Field Small".
@@ -73,26 +74,37 @@ void game_init(Game *game) {
     };
     CPos p = (CPos) {-4, 0, 4};
     *board_at(game, p) = red_crown;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_RIGHT_UP);
     *board_at(game, p) = red_bow;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_RIGHT_UP);
     *board_at(game, p) = red_horse;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_RIGHT);
     *board_at(game, p) = red_pike;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_LEFT_DOWN);
     *board_at(game, p) = red_pike;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_LEFT_DOWN);
     *board_at(game, p) = red_bow;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_RIGHT);
     *board_at(game, p) = red_pike;
+    board_at(game, p)->id = 3;
     p = cpos_add(p, CPOS_LEFT_DOWN);
     *board_at(game, p) = red_pike;
+    board_at(game, p)->id = 4;
     p = cpos_add(p, CPOS_LEFT);
     *board_at(game, p) = red_bow;
+    board_at(game, p)->id = 3;
     p = cpos_add(p, CPOS_RIGHT_DOWN);
     *board_at(game, p) = red_horse;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_RIGHT);
     *board_at(game, p) = red_pike;
+    board_at(game, p)->id = 5;
 
     Piece blue_crown = {
             .kind = PIECE_CROWN,
@@ -112,24 +124,35 @@ void game_init(Game *game) {
     };
     p = (CPos) {4, 0, -4};
     *board_at(game, p) = blue_crown;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_LEFT_UP);
     *board_at(game, p) = blue_bow;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_LEFT_UP);
     *board_at(game, p) = blue_horse;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_LEFT);
     *board_at(game, p) = blue_pike;
+    board_at(game, p)->id = 1;
     p = cpos_add(p, CPOS_RIGHT_DOWN);
     *board_at(game, p) = blue_pike;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_RIGHT_DOWN);
     *board_at(game, p) = blue_bow;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_LEFT);
     *board_at(game, p) = blue_pike;
+    board_at(game, p)->id = 3;
     p = cpos_add(p, CPOS_RIGHT_DOWN);
     *board_at(game, p) = blue_pike;
+    board_at(game, p)->id = 4;
     p = cpos_add(p, CPOS_RIGHT);
     *board_at(game, p) = blue_bow;
+    board_at(game, p)->id = 3;
     p = cpos_add(p, CPOS_LEFT_DOWN);
     *board_at(game, p) = blue_horse;
+    board_at(game, p)->id = 2;
     p = cpos_add(p, CPOS_LEFT);
     *board_at(game, p) = blue_pike;
+    board_at(game, p)->id = 5;
 }
