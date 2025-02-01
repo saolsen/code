@@ -1,7 +1,7 @@
 #ifndef TAZAR_H
 #define TAZAR_H
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#include "steve.h"
 
 // Hex position in double coordinates.
 // * Useful coordinates for game logic.
@@ -53,6 +53,28 @@ typedef struct {
     Player player;
     int id;
 } Piece;
+
+typedef enum {
+    ACTION_NONE = 0,
+    ACTION_MOVE,
+    ACTION_VOLLEY,
+    ACTION_CHARGE,
+    ACTION_END,
+} ActionKind;
+
+typedef struct {
+    ActionKind kind;
+    PieceKind piece;
+    int piece_id;
+    CPos target; // target is relative to the unit.
+} Action;
+
+typedef struct {
+    Action action;
+    String error;
+} ParseAction;
+
+ParseAction action_parse(Arena *a, String action_str);
 
 typedef struct {
     Piece board[81];

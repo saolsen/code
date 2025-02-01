@@ -3,9 +3,12 @@
 // Been running this alongside and inputting all the moves into the real game, that's why it
 // asks for the results of Volley rolls. Not really meant to be "played" standalone.
 
-#include "tazar.h"
 #include "tazar_game.c"
+#include "tazar_parse.c"
 #include "tazar_cli.c"
+
+#define STEVE_IMPLEMENTATION
+#include "steve.h"
 
 int main(void) {
     return cli_main();

@@ -1,3 +1,4 @@
+#include "steve.h"
 #include "tazar.h"
 
 #include <locale.h>
@@ -64,30 +65,37 @@ void cli_game_draw(Game *game) {
             buf[(char_y + 1) * 80 + (char_x + 1)] = L'╱';
 
             // Draw piece.
+            wchar_t letter;
             wchar_t symbol;
             wchar_t id;
             switch (piece.kind) {
                 case PIECE_CROWN:
+                    letter = L'c';
                     symbol = piece.player == PLAYER_RED ? L'☆' : L'★';
                     id = L'0' + piece.id;
                     break;
                 case PIECE_PIKE:
+                    letter = L'p';
                     symbol = piece.player == PLAYER_RED ? L'□' : L'■';
                     id = L'0' + piece.id;
                     break;
                 case PIECE_HORSE:
+                    letter = L'h';
                     symbol = piece.player == PLAYER_RED ? L'△' : L'▲';
                     id = L'0' + piece.id;
                     break;
                 case PIECE_BOW:
+                    letter = L'b';
                     symbol = piece.player == PLAYER_RED ? L'○' : L'●';
                     id = L'0' + piece.id;
                     break;
                 default:
+                    letter = L' ';
                     symbol = L' ';
                     id = L' ';
                     break;
             }
+            buf[(char_y - 1) * 80 + char_x] = letter;
             buf[char_y * 80 + char_x] = symbol;
             buf[(char_y + 1) * 80 + char_x] = id;
         }
@@ -101,8 +109,14 @@ void cli_game_draw(Game *game) {
 }
 
 #include <stdlib.h>
-#include "bestline.h"
+#include "../3rdparty/bestline/bestline.h"
 
+// todo: cli args
+//  * help to show that help message.
+//  * play the game in various modes
+//    2 human players
+//    human blue, ai red
+//    2 ai players
 int cli_main(void) {
     setlocale(LC_ALL, "");
     cli_set_wide_stream(stdout);
@@ -112,7 +126,7 @@ int cli_main(void) {
     wprintf(L"Units: ☆ = (c)rown, □ = (p)ike, △ = (h)orse, ○ = (b)ow.\n  Refer to units by id, eg: 'p2'\n");
     wprintf(L"Actions: (move),(volley),(charge),(end)'\n");
     wprintf(L"Directions: (r)ight-(u)p, (r)ight, (r)ight-(d)own, (l)eft-(d)own, (l)eft, (l)eft-(u)p.'\n");
-    wprintf(L"Commands: '[UNIT] [ACTION] [TARGET PATH]'.\n");
+    wprintf(L"Commands: '[UNIT] [ACTION] [TARGET PATH..]'.\n");
     wprintf(L" examples:\n");
     wprintf(L"   'p3 move ru r'      Move pike(3) 2 tiles. Right-up, then right\n");
     wprintf(L"   'b1 volley r r r'   Shoots a volley from bow(1) at the tile two to the right of it.\n");
@@ -123,14 +137,18 @@ int cli_main(void) {
     cli_game_draw(&game);
 
     char *line;
-    while ((line = bestlineWithHistory("IN> ", "foo"))) {
-        fputs("OUT> ", stdout);
-        fputs(line, stdout);
-        fputs("\n", stdout);
+    while ((line = bestlineWithHistory("ACTION> ", "foo"))) {
+        String action_str = str(line);
+        Arena *scratch = scratch_acquire();
+
+        ParseAction action = action_parse(scratch, action_str);
+        printf("action: %d %d %d %d %d %s\n", action.action.kind, action.action.piece, action.action.piece_id,
+               action.action.target.q, action.action.target.r, action.error.e);
+
+        scratch_release();
         free(line);
         cli_game_draw(&game);
     }
-
 
     return 0;
 }
@@ -174,7 +192,7 @@ wprintf(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     wprintf(L"      │ Y │ Y │ Y │ Y │ Y │ Y │ Y │      \n");
     wprintf(L"       ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱       \n");
     wprintf(L"        │ Y │ Y │ Y │ Y │ Y │RB4│        \n");
-    wprintf(L"         ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱         \n");
+    wprintf(L"         ╲ ╱p╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱ ╲ ╱         \n");
     wprintf(L"          │ ■ │ Y │RC1│ ■ │BP3│          \n");
     wprintf(L"           ╲1╱ ╲ ╱ ╲ ╱ ╲5╱ ╲ ╱           \n");
     wprintf(L"                                         \n");

@@ -30,8 +30,11 @@ add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
+add_library(bestline ../3rdparty/bestline/bestline.c)
+
 add_executable(tazar ../tazar/tazar_main.c)
-add_library(bestline ../tazar/bestline.c)
+target_include_directories(tazar PRIVATE ../3rdparty/bestline)
+target_include_directories(tazar PRIVATE ..)
 target_link_libraries(tazar compile-options bestline)
 add_test(NAME tazar COMMAND tazar)
 

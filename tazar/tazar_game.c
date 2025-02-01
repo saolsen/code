@@ -1,3 +1,5 @@
+#include "tazar.h"
+
 #include <string.h>
 
 DPos dpos_from_cpos(CPos cpos) {
