@@ -3,6 +3,30 @@
 
 #include <stdio.h>
 
+String piece_str(Arena *a, Piece piece) {
+    Arena *scratch = scratch_acquire();
+    String player_str = piece.player == PLAYER_RED ? str_format(scratch, "Red") : str_format(scratch, "Blue");
+    String kind_str;
+    switch (piece.kind) {
+        case PIECE_CROWN:
+            kind_str = str_format(scratch, "Crown");
+            break;
+        case PIECE_PIKE:
+            kind_str = str_format(scratch, "Pike");
+            break;
+        case PIECE_HORSE:
+            kind_str = str_format(scratch, "Horse");
+            break;
+        case PIECE_BOW:
+            kind_str = str_format(scratch, "Bow");
+            break;
+        default:
+            kind_str = str_format(scratch, "Unknown");
+            break;
+    }
+    return str_format(a, "%.*s %.*s %d", player_str.len, player_str.e, kind_str.len, kind_str.e, piece.id);
+}
+
 ParseAction action_parse(Arena *a, String action_str) {
     Arena *scratch = scratch_acquire();
     StringSlice parts = str_split(scratch, action_str, ' ');

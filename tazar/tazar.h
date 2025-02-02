@@ -74,12 +74,29 @@ typedef struct {
     String error;
 } ParseAction;
 
+String piece_str(Arena *a, Piece piece);
+
 ParseAction action_parse(Arena *a, String action_str);
+
+typedef enum {
+    STATUS_NONE = 0,
+    STATUS_IN_PROGRESS,
+    STATUS_OVER,
+} Status;
 
 typedef struct {
     Piece board[81];
+    Status status;
+    Player active_player;
+    Piece active_piece;
+    int turn_actions_left;
+    Player winner;
 } Game;
 
 void game_init_attrition_hex_field_small(Game *game);
+
+// Apply an action.
+// Returns an error message if the action is invalid.
+String game_apply_action(Arena *a, Game *game, Player player, Action action);
 
 #endif //TAZAR_H

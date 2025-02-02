@@ -133,7 +133,7 @@ int cli_main(void) {
     wprintf(L"Red (you) goes first.\n");
 
     Game game;
-    game_init(&game);
+    game_init_attrition_hex_field_small(&game);
     cli_game_draw(&game);
 
     char *line;
@@ -142,9 +142,14 @@ int cli_main(void) {
         Arena *scratch = scratch_acquire();
 
         ParseAction action = action_parse(scratch, action_str);
-        printf("action: %d %d %d %d %d %s\n", action.action.kind, action.action.piece, action.action.piece_id,
-               action.action.target.q, action.action.target.r, action.error.e);
+        if (action.error.len > 0) {
+            wprintf(L"error: %.*s\n", action.error.len, action.error.e);
+            goto next_action;
+        }
+        // todo: check if action is valid
+        game_apply_action(scratch, &game, PLAYER_RED, action.action);
 
+        next_action:
         scratch_release();
         free(line);
         cli_game_draw(&game);
