@@ -20,6 +20,8 @@ typedef struct {
 #define CPOS_LEFT (CPos){-1,0,1}
 #define CPOS_LEFT_UP (CPos){0,-1,1}
 
+bool cpos_eq(CPos a, CPos b);
+
 CPos cpos_add(CPos a, CPos b);
 
 // Hex position in double coordinates.
@@ -95,8 +97,13 @@ typedef struct {
 
 void game_init_attrition_hex_field_small(Game *game);
 
+typedef Slice(Action) ActionSlice;
+typedef Array(Action) ActionArray;
+
 // Apply an action.
 // Returns an error message if the action is invalid.
 String game_apply_action(Arena *a, Game *game, Player player, Action action);
+
+ActionSlice game_valid_actions(Arena *a, Game *game, Player player);
 
 #endif //TAZAR_H

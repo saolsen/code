@@ -16,6 +16,10 @@ CPos cpos_from_dpos(DPos dpos) {
     return (CPos) {q, r, s};
 }
 
+bool cpos_eq(CPos a, CPos b) {
+    return a.q == b.q && a.r == b.r && a.s == b.s;
+}
+
 CPos cpos_add(CPos a, CPos b) {
     return (CPos) {a.q + b.q, a.r + b.r, a.s + b.s};
 }
@@ -180,6 +184,98 @@ void game_init_attrition_hex_field_small(Game *game) {
     game->active_piece = (Piece) {.kind = PIECE_NONE};
     game->turn_actions_left = 1;
     game->winner = PLAYER_NONE;
+}
+
+typedef Array(CPos) CPosArray;
+
+ActionSlice game_valid_actions(Arena *a, Game *game, Player player) {
+    Arena *scratch = scratch_acquire();
+    ActionArray *actions = NULL;
+
+    for (int r = -4; r <= 4; r++) {
+        for (int q = -4; q <= 4; q++) {
+            CPos cpos = {q, r, -q - r};
+            Piece *piece = board_at(game, cpos);
+            if (piece->player != player) {
+                continue;
+            }
+            // Figure out all the valid moves.
+            // Figure out targets in charge range.
+            // Figure out targets in volley range.
+            switch (piece->kind) {
+                case PIECE_CROWN: {
+                    break;
+                }
+                case PIECE_PIKE: {
+                    CPosArray *visited = NULL;
+                    arr_push(scratch, visited, cpos);
+
+                    uint64_t i = 0;
+                    for (uint64_t steps = 0; steps < 2; steps++) {
+                        uint64_t current_len = visited->len;
+                        for (; i < current_len; i++) {
+                            CPos current = visited->e[i];
+                            Piece *current_piece = board_at(game, current);
+                            // Check if this is a valid piece to keep searching from.
+                            if (!(cpos_eq(current, cpos) || current_piece->kind == PIECE_EMPTY)) {
+                                continue;
+                            }
+                            CPos neighbors[6] = {
+                                    cpos_add(current, CPOS_RIGHT_UP),
+                                    cpos_add(current, CPOS_RIGHT),
+                                    cpos_add(current, CPOS_RIGHT_DOWN),
+                                    cpos_add(current, CPOS_LEFT_DOWN),
+                                    cpos_add(current, CPOS_LEFT),
+                                    cpos_add(current, CPOS_LEFT_UP),
+                            };
+                            for (int n = 0; n < 6; n++) {
+                                CPos neighbor = neighbors[n];
+                                bool already_checked = false;
+                                for (uint64_t j = 0; j < visited->len; j++) {
+                                    if (cpos_eq(visited->e[j], neighbor)) {
+                                        already_checked = true;
+                                        break;
+                                    }
+                                }
+                                if (already_checked) {
+                                    continue;
+                                }
+
+                                Piece *neighbor_piece = board_at(game, neighbor);
+                                if (neighbor_piece->kind == PIECE_EMPTY ||
+                                    (neighbor_piece->kind != PIECE_NONE && neighbor_piece->kind != PIECE_PIKE &&
+                                     neighbor_piece->player != player)) {
+                                    arr_push(scratch, visited, neighbor);
+                                    arr_push(a, actions, ((Action) {
+                                            .kind = ACTION_MOVE,
+                                            .piece = piece->kind,
+                                            .piece_id = piece->id,
+                                            .target = neighbor
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                case PIECE_HORSE: {
+                    break;
+                }
+                case PIECE_BOW: {
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
+    scratch_release();
+    if (actions == NULL) {
+        return (ActionSlice) {0};
+    } else {
+        return (ActionSlice) arr_slice(actions);
+    }
 }
 
 // Find valid actions.
