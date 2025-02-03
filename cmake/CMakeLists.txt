@@ -30,14 +30,6 @@ add_executable(test_steve ../test_steve.c)
 target_link_libraries(test_steve compile-options)
 add_test(NAME test_steve COMMAND test_steve)
 
-add_library(bestline ../3rdparty/bestline/bestline.c)
-
-add_executable(tazar ../tazar/tazar_main.c)
-target_include_directories(tazar PRIVATE ../3rdparty/bestline)
-target_include_directories(tazar PRIVATE ..)
-target_link_libraries(tazar compile-options bestline)
-add_test(NAME tazar COMMAND tazar)
-
 if (NOT (CMAKE_C_COMPILER_ID STREQUAL "MSVC"))
     add_executable(dandd ../dandd.c)
     target_link_libraries(dandd compile-options)
@@ -56,3 +48,23 @@ if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "
     target_link_libraries(bigints compile-options)
     add_test(NAME bigints COMMAND bigints)
 endif ()
+
+add_library(bestline ../3rdparty/bestline/bestline.c)
+
+include(FetchContent)
+set(FETCHCONTENT_QUIET FALSE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
+FetchContent_Declare(
+        raylib
+        GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
+        GIT_TAG "master"
+        GIT_PROGRESS TRUE
+)
+FetchContent_MakeAvailable(raylib)
+
+add_executable(tazar ../tazar/tazar_main.c)
+target_include_directories(tazar PRIVATE ../3rdparty/bestline)
+target_include_directories(tazar PRIVATE ..)
+target_link_libraries(tazar PRIVATE compile-options raylib)
+#target_link_libraries(tazar compile-options bestline)

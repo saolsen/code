@@ -1122,7 +1122,7 @@ static void test_strings(void) {
     Arena *a = arena_new();
 
     // format
-    String s1 = format(a, "Hello %d %s", 42, "World");
+    String s1 = str_format(a, "Hello %d %s", 42, "World");
     assert(s1.len == 14);
     assert(strncmp((const char *) s1.e, "Hello 42 World", s1.len) == 0);
 
