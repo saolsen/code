@@ -66,7 +66,6 @@ typedef enum {
 
 typedef struct {
     ActionKind kind;
-    PieceKind piece;
     int piece_id;
     CPos target; // target is relative to the unit.
 } Action;
@@ -90,8 +89,10 @@ typedef struct {
     Piece board[81];
     Status status;
     Player active_player;
-    Piece active_piece;
-    int turn_actions_left;
+    int turn_pieces_left;
+    int active_piece_id;
+    bool active_piece_did_move;
+    bool active_piece_did_special;
     Player winner;
 } Game;
 
@@ -104,6 +105,6 @@ typedef Array(Action) ActionArray;
 // Returns an error message if the action is invalid.
 String game_apply_action(Arena *a, Game *game, Player player, Action action);
 
-ActionSlice game_valid_actions(Arena *a, Game *game, Player player);
+ActionSlice game_valid_actions(Arena *a, Game *game);
 
 #endif //TAZAR_H

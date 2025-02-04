@@ -9,6 +9,9 @@
 // a match id and use raw sqlite to get it done faster.
 // Another alternative is do the whole thing in javascript. Def easier and faster, just less fun.
 
+
+// Just have a single global id, and look stuff up by id, way easier.
+
 // A really basic implementation of Tazar and an AI player, so I have someone to play with.
 // https://kelleherbros.itch.io/tazar
 // Been running this alongside and inputting all the moves into the real game, that's why it
@@ -27,7 +30,6 @@
 #define MAX_GESTURE_STRINGS   20
 
 
-// The UI interactions are making this hard. Obviously need to separate the update and input stuff from the drawing.
 typedef enum {
     UI_STATE_NONE,
     UI_STATE_WAITING_FOR_SELECTION,
@@ -72,12 +74,12 @@ int main(void) {
     Arena *frame_arena = arena_new();
 
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
+    int selected_piece_id = 0;
 
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
 
-        ActionSlice red_actions = game_valid_actions(frame_arena, &game, PLAYER_RED);
-        ActionSlice blue_actions = game_valid_actions(frame_arena, &game, PLAYER_BLUE);
+        ActionSlice actions = game_valid_actions(frame_arena, &game);
 
         bool mouse_in_game_area = CheckCollisionPointRec(GetMousePosition(), game_area) &&
                                   !(CheckCollisionPointRec(GetMousePosition(), left_panel) ||
@@ -100,8 +102,6 @@ int main(void) {
                 if (piece.kind == PIECE_NONE) {
                     continue;
                 }
-                Vector2 screen_pos = (Vector2) {game_center.x + (horizontal_offset * dpos.x),
-                                                game_center.y + vertical_offset * dpos.y};
                 // Check Mouse Position.
                 if (CheckCollisionPointCircle(GetMousePosition(),
                                               (Vector2) {game_center.x + horizontal_offset * dpos.x,
@@ -114,18 +114,38 @@ int main(void) {
         }
 
         // Update
+        if (ui_state == UI_STATE_WAITING_FOR_ACTION) {
+            if (mouse_clicked && mouse_in_game_area && !mouse_in_board) {
+                selected_piece_id = 0;
+                ui_state = UI_STATE_WAITING_FOR_SELECTION;
+            } else if (mouse_clicked && mouse_in_board) {
+                Piece clicked_piece = *board_at(&game, mouse_cpos);
+                bool matched_action = false;
+                for (uint64_t i = 0; i < actions.len; i++) {
+                    Action action = actions.e[i];
+                    if (action.piece_id == selected_piece_id && cpos_eq(action.target, mouse_cpos)) {
+                        String error = game_apply_action(frame_arena, &game, game.active_player, action);
+                        if (error.len > 0) {
+                            printf("Error: %.*s\n", error.len, error.e);
+                        }
+                        ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                        matched_action = true;
+                        break;
+                    }
+                }
+                if (!matched_action) {
+                    selected_piece_id = 0;
+                    ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                }
+            }
+        }
         if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
             if (mouse_clicked && mouse_in_board) {
                 Piece selected_piece = *board_at(&game, mouse_cpos);
                 if (selected_piece.player == game.active_player) {
-                    game.active_piece = selected_piece;
+                    selected_piece_id = selected_piece.id;
                     ui_state = UI_STATE_WAITING_FOR_ACTION;
                 }
-            }
-        } else if (ui_state == UI_STATE_WAITING_FOR_ACTION) {
-            if (mouse_clicked && mouse_in_game_area && !mouse_in_board) {
-                game.active_piece = piece_null;
-                ui_state = UI_STATE_WAITING_FOR_SELECTION;
             }
         }
 
@@ -210,11 +230,9 @@ int main(void) {
             }
         }
         if (ui_state == UI_STATE_WAITING_FOR_ACTION) {
-            Piece selected_piece = game.active_piece;
-            ActionSlice actions = selected_piece.player == PLAYER_RED ? red_actions : blue_actions;
             for (uint64_t i = 0; i < actions.len; i++) {
                 Action action = actions.e[i];
-                if (action.piece == selected_piece.kind && action.piece_id == selected_piece.id) {
+                if (action.piece_id == selected_piece_id) {
                     DPos target_dpos = dpos_from_cpos(action.target);
                     Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
                                                     game_center.y + vertical_offset * target_dpos.y};
@@ -226,17 +244,14 @@ int main(void) {
         if (mouse_in_board) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
 
-            if (ui_state == UI_STATE_WAITING_FOR_ACTION &&
-                hovered_piece.kind == game.active_piece.kind &&
-                hovered_piece.player == game.active_piece.player &&
-                hovered_piece.id == game.active_piece.id) {
-                // Don't show hover for the selected one.
-            } else if (hovered_piece.kind != PIECE_NONE && hovered_piece.kind != PIECE_EMPTY) {
-                ActionSlice actions = hovered_piece.player == PLAYER_RED ? red_actions : blue_actions;
+
+            if (!(ui_state == UI_STATE_WAITING_FOR_ACTION && hovered_piece.id == selected_piece_id) &&
+                !(hovered_piece.kind == PIECE_NONE || hovered_piece.kind == PIECE_EMPTY) &&
+                hovered_piece.player == game.active_player) {
                 Color color = hovered_piece.player == PLAYER_RED ? MAROON : DARKBLUE;
                 for (uint64_t i = 0; i < actions.len; i++) {
                     Action action = actions.e[i];
-                    if (action.piece == hovered_piece.kind && action.piece_id == hovered_piece.id) {
+                    if (action.piece_id == hovered_piece.id) {
                         DPos target_dpos = dpos_from_cpos(action.target);
                         Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
                                                         game_center.y + vertical_offset * target_dpos.y};

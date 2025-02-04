@@ -47,20 +47,20 @@ ParseAction action_parse(Arena *a, String action_str) {
                                   unit_str.e);
         goto end;
     }
-    switch (unit_str.e[0]) {
-        case 'c':
-            action.action.piece = PIECE_CROWN;
-            break;
-        case 'p':
-            action.action.piece = PIECE_PIKE;
-            break;
-        case 'h':
-            action.action.piece = PIECE_HORSE;
-            break;
-        case 'b':
-            action.action.piece = PIECE_BOW;
-            break;
-    }
+//    switch (unit_str.e[0]) {
+//        case 'c':
+//            action.action.piece = PIECE_CROWN;
+//            break;
+//        case 'p':
+//            action.action.piece = PIECE_PIKE;
+//            break;
+//        case 'h':
+//            action.action.piece = PIECE_HORSE;
+//            break;
+//        case 'b':
+//            action.action.piece = PIECE_BOW;
+//            break;
+//    }
     if (unit_str.e[1] < '1' || unit_str.e[1] > '9') {
         action.error = str_format(a, "Invalid unit id '%.*s', expected a number", unit_str.len - 1, unit_str.e + 1);
         goto end;
