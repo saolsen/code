@@ -1,17 +1,3 @@
-// well, now for sharing reasons I think it'd be nice to do this via a web interface.
-// Then I could host it on val.town and the bros could play it directly.
-// In that case I'd prolly wanna write just the core logic in c and build the ui in javascript.
-// The AI turn could be done serverside, which makes it "async" and won't block the UI.
-// It could still be stateless, where the game state is passed around each time, that's kind of nice
-// since I don't have to deal with state, but you wouldn't be able to refresh the page that way.
-// Saving gamestate and turns in a database the way gameplay.computer works would be better.
-// That's more work that I don't super feel like doing, but also not a huge deal. I can just store
-// a match id and use raw sqlite to get it done faster.
-// Another alternative is do the whole thing in javascript. Def easier and faster, just less fun.
-
-
-// Just have a single global id, and look stuff up by id, way easier.
-
 // A really basic implementation of Tazar and an AI player, so I have someone to play with.
 // https://kelleherbros.itch.io/tazar
 // Been running this alongside and inputting all the moves into the real game, that's why it
@@ -25,25 +11,11 @@
 
 #include "raylib.h"
 
-#define MAX_GESTURE_STRINGS   20
-
-
 typedef enum {
     UI_STATE_NONE,
     UI_STATE_WAITING_FOR_SELECTION,
     UI_STATE_WAITING_FOR_COMMAND,
-    UI_STATE_ANIMATING_ACTION,
-    // UI_STATE_WAITING_FOR_SHIELD_WALL_RESULT,
-    UI_STATE_WAITING_FOR_OPPONENT_ACTION,
-    UI_STATE_GAME_OVER
 } UIState;
-
-// During waiting for selection you can hover units to show actions
-// During waiting for action you can still hover units to show their actions, but will need to
-// show that in a different way.
-// Animating will show the pieces moving.
-// During waiting for opponent you can still hover to show I think. So I guess you should be able to hover during animations too.
-// Need the visualization for hover to be different from the one for picking after selection.
 
 int main(void) {
     Game game;
@@ -327,9 +299,3 @@ int main(void) {
 
     CloseWindow();
 }
-
-//int main(void) {
-//    //return cli_main();
-//    printf("Hello, World!\n");
-//    return 0;
-//}
