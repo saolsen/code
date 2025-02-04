@@ -57,27 +57,28 @@ typedef struct {
 } Piece;
 
 typedef enum {
-    ACTION_NONE = 0,
-    ACTION_MOVE,
-    ACTION_VOLLEY,
-    ACTION_CHARGE,
-    ACTION_END,
-} ActionKind;
+    ORDER_NONE = 0,
+    ORDER_MOVE,
+    ORDER_VOLLEY,
+    // muster
+} OrderKind;
 
 typedef struct {
-    ActionKind kind;
+    OrderKind kind;
+    CPos target;
+} Order;
+
+typedef struct {
     int piece_id;
-    CPos target; // target is relative to the unit.
-} Action;
+    Order orders[2];
+    int order_i;
+} Activation;
 
 typedef struct {
-    Action action;
-    String error;
-} ParseAction;
-
-String piece_str(Arena *a, Piece piece);
-
-ParseAction action_parse(Arena *a, String action_str);
+    Player player;
+    Activation activations[2];
+    int activation_i;
+} Turn;
 
 typedef enum {
     STATUS_NONE = 0,
@@ -88,23 +89,47 @@ typedef enum {
 typedef struct {
     Piece board[81];
     Status status;
-    Player active_player;
-    int turn_pieces_left;
-    int active_piece_id;
-    bool active_piece_did_move;
-    bool active_piece_did_special;
     Player winner;
+    // hardcoded to 2 players
+    int gold[3]; // indexed by player, ignore gold[0].
+    Turn turn;
 } Game;
 
 void game_init_attrition_hex_field_small(Game *game);
 
-typedef Slice(Action) ActionSlice;
-typedef Array(Action) ActionArray;
+// commands are you telling the game what to do. these are the things to generate I think.
+typedef enum {
+    COMMAND_NONE = 0,
+    COMMAND_MOVE,
+    COMMAND_VOLLEY,
+    // muster
+    COMMAND_END_TURN,
+} CommandKind;
+
+// note: Probably want to specify the piece by CPos so that all possible commands
+// can be packed into a single array. Will need that for RL.
+typedef struct {
+    CommandKind kind;
+    int piece_id;
+    CPos target;
+} Command;
+
+typedef Slice(Command) CommandSlice;
+typedef Array(Command) CommandArray;
+
+CommandSlice game_valid_commands(Arena *a, Game *game);
+
+void game_apply_command(Arena *a, Game *game, Player player, Command command);
+
+
+
+//typedef Slice(Action) ActionSlice;
+//typedef Array(Action) ActionArray;
 
 // Apply an action.
 // Returns an error message if the action is invalid.
-String game_apply_action(Arena *a, Game *game, Player player, Action action);
+//String game_apply_action(Arena *a, Game *game, Player player, Action action);
 
-ActionSlice game_valid_actions(Arena *a, Game *game);
+//ActionSlice game_valid_actions(Arena *a, Game *game);
 
 #endif //TAZAR_H

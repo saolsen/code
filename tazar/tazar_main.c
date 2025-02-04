@@ -19,8 +19,6 @@
 
 #include <math.h>
 #include "tazar_game.c"
-#include "tazar_parse.c"
-//#include "tazar_cli.c"
 
 #define STEVE_IMPLEMENTATION
 #include "steve.h"
@@ -33,7 +31,7 @@
 typedef enum {
     UI_STATE_NONE,
     UI_STATE_WAITING_FOR_SELECTION,
-    UI_STATE_WAITING_FOR_ACTION,
+    UI_STATE_WAITING_FOR_COMMAND,
     UI_STATE_ANIMATING_ACTION,
     // UI_STATE_WAITING_FOR_SHIELD_WALL_RESULT,
     UI_STATE_WAITING_FOR_OPPONENT_ACTION,
@@ -59,6 +57,8 @@ int main(void) {
 
     Rectangle left_panel = {game_area.x + 5, game_area.y + 5, 100, 115};
     Rectangle right_panel = {game_area.x + game_area.width - 105, game_area.y + 5, 100, 115};
+    Rectangle end_turn_button = {game_area.x + 10, 36, 60, 20};
+
 
     float hexes_across = 12.0f;
     float hex_radius = floorf(game_area.width * sqrtf(3.0f) / (3 * hexes_across));
@@ -79,11 +79,12 @@ int main(void) {
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
 
-        ActionSlice actions = game_valid_actions(frame_arena, &game);
+        CommandSlice commands = game_valid_commands(frame_arena, &game);
 
         bool mouse_in_game_area = CheckCollisionPointRec(GetMousePosition(), game_area) &&
                                   !(CheckCollisionPointRec(GetMousePosition(), left_panel) ||
                                     CheckCollisionPointRec(GetMousePosition(), right_panel));
+        bool mouse_in_end_turn_button = CheckCollisionPointRec(GetMousePosition(), end_turn_button);
         bool mouse_in_board = false;
         CPos mouse_cpos = {0, 0, 0};
         bool mouse_clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
@@ -114,40 +115,68 @@ int main(void) {
         }
 
         // Update
-        if (ui_state == UI_STATE_WAITING_FOR_ACTION) {
+        bool keep_selected = false;
+        if (mouse_clicked && mouse_in_end_turn_button) {
+            game_apply_command(frame_arena, &game, game.turn.player, ((Command) {
+                    .kind = COMMAND_END_TURN,
+                    .piece_id = 0,
+                    .target = (CPos) {0, 0, 0},
+            }));
+            commands = game_valid_commands(frame_arena, &game);
+            ui_state = UI_STATE_WAITING_FOR_SELECTION;
+        }
+        if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
             if (mouse_clicked && mouse_in_game_area && !mouse_in_board) {
                 selected_piece_id = 0;
                 ui_state = UI_STATE_WAITING_FOR_SELECTION;
             } else if (mouse_clicked && mouse_in_board) {
-                Piece clicked_piece = *board_at(&game, mouse_cpos);
-                bool matched_action = false;
-                for (uint64_t i = 0; i < actions.len; i++) {
-                    Action action = actions.e[i];
-                    if (action.piece_id == selected_piece_id && cpos_eq(action.target, mouse_cpos)) {
-                        String error = game_apply_action(frame_arena, &game, game.active_player, action);
-                        if (error.len > 0) {
-                            printf("Error: %.*s\n", error.len, error.e);
+                bool matched_command = false;
+                for (uint64_t i = 0; i < commands.len; i++) {
+                    Command command = commands.e[i];
+                    if (command.piece_id == selected_piece_id && cpos_eq(command.target, mouse_cpos)) {
+
+                        // hack, don't unselect a bow after shooting.
+                        keep_selected = command.kind == COMMAND_VOLLEY &&
+                                        (game.turn.activations[game.turn.activation_i].piece_id !=
+                                         selected_piece_id ||
+                                         game.turn.activations[game.turn.activation_i].order_i == 0);
+
+                        game_apply_command(frame_arena, &game, game.turn.player, command);
+                        // update commands
+                        commands = game_valid_commands(frame_arena, &game);
+
+                        if (!keep_selected) {
+                            ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                            matched_command = true;
                         }
-                        ui_state = UI_STATE_WAITING_FOR_SELECTION;
-                        matched_action = true;
                         break;
                     }
                 }
-                if (!matched_action) {
+                if (!matched_command && !keep_selected) {
                     selected_piece_id = 0;
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
             }
         }
         if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
-            if (mouse_clicked && mouse_in_board) {
+            if (!keep_selected && mouse_clicked && mouse_in_board) {
                 Piece selected_piece = *board_at(&game, mouse_cpos);
-                if (selected_piece.player == game.active_player) {
-                    selected_piece_id = selected_piece.id;
-                    ui_state = UI_STATE_WAITING_FOR_ACTION;
+                if (selected_piece.player == game.turn.player) {
+                    for (uint64_t i = 0; i < commands.len; i++) {
+                        Command command = commands.e[i];
+                        if (command.piece_id == selected_piece.id) {
+                            selected_piece_id = selected_piece.id;
+                            ui_state = UI_STATE_WAITING_FOR_COMMAND;
+                            break;
+                        }
+                    }
                 }
             }
         }
+
+        // ok, so I need just a couple more things.
+        // a selected outline. and an end turn button.
+        // and if there are no actions I can take except for end turn, I should auto end it.
 
         // Draw
         BeginDrawing();
@@ -162,7 +191,22 @@ int main(void) {
 
         // Left Panel
         DrawRectangleRec(left_panel, RAYWHITE);
-        DrawText("BLUE TURN", game_area.x + 10, 18, 10, GRAY);
+        if (game.turn.player == PLAYER_RED) {
+            DrawText("RED's TURN", game_area.x + 10, 18, 10, GRAY);
+        } else {
+            DrawText("BLUE's TURN", game_area.x + 10, 18, 10, GRAY);
+        }
+
+        // end turn button
+
+        DrawRectangleRec(end_turn_button, LIGHTGRAY);
+        DrawText("END TURN", game_area.x + 13, 41, 10, RAYWHITE);
+        if (mouse_in_end_turn_button) {
+            DrawRectangleLines(end_turn_button.x, end_turn_button.y, end_turn_button.width, end_turn_button.height,
+                               PINK);
+            DrawText("END TURN", game_area.x + 13, 41, 10, PINK);
+        }
+
 
         // Right Panel
         DrawRectangleRec(right_panel, RAYWHITE);
@@ -201,6 +245,10 @@ int main(void) {
                     color = PINK; // draw pink for invalid stuff, helps with debugging.
                 }
 
+                if (ui_state == UI_STATE_WAITING_FOR_COMMAND && piece.id == selected_piece_id) {
+                    color = RAYWHITE;
+                }
+
                 switch (piece.kind) {
                     case PIECE_CROWN: {
                         DrawTriangle((Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
@@ -229,162 +277,47 @@ int main(void) {
                 }
             }
         }
-        if (ui_state == UI_STATE_WAITING_FOR_ACTION) {
-            for (uint64_t i = 0; i < actions.len; i++) {
-                Action action = actions.e[i];
-                if (action.piece_id == selected_piece_id) {
-                    DPos target_dpos = dpos_from_cpos(action.target);
+        if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
+            for (uint64_t i = 0; i < commands.len; i++) {
+                Command command = commands.e[i];
+                if (command.piece_id == selected_piece_id) {
+                    DPos target_dpos = dpos_from_cpos(command.target);
                     Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
                                                     game_center.y + vertical_offset * target_dpos.y};
-                    DrawPolyLinesEx(target_pos, 6, hex_radius - 1,
-                                    90, 4, RAYWHITE);
+                    if (command.kind == COMMAND_MOVE) {
+                        DrawPolyLinesEx(target_pos, 6, hex_radius - 1,
+                                        90, 4, RAYWHITE);
+                    } else if (command.kind == COMMAND_VOLLEY) {
+                        DrawCircle(target_pos.x, target_pos.y, hex_radius / 4, RAYWHITE);
+                    }
                 }
             }
         }
         if (mouse_in_board) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
-
-
-            if (!(ui_state == UI_STATE_WAITING_FOR_ACTION && hovered_piece.id == selected_piece_id) &&
+            if ((ui_state != UI_STATE_WAITING_FOR_COMMAND) &&
                 !(hovered_piece.kind == PIECE_NONE || hovered_piece.kind == PIECE_EMPTY) &&
-                hovered_piece.player == game.active_player) {
+                hovered_piece.player == game.turn.player) {
                 Color color = hovered_piece.player == PLAYER_RED ? MAROON : DARKBLUE;
-                for (uint64_t i = 0; i < actions.len; i++) {
-                    Action action = actions.e[i];
-                    if (action.piece_id == hovered_piece.id) {
-                        DPos target_dpos = dpos_from_cpos(action.target);
+
+                for (uint64_t i = 0; i < commands.len; i++) {
+                    Command command = commands.e[i];
+                    if (command.piece_id == hovered_piece.id) {
+                        DPos target_dpos = dpos_from_cpos(command.target);
                         Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
                                                         game_center.y + vertical_offset * target_dpos.y};
-                        DrawPolyLinesEx(target_pos, 6, hex_radius - 2,
-                                        90, 2, color);
+                        if (command.kind == COMMAND_MOVE) {
+                            DrawPolyLinesEx(target_pos, 6, hex_radius - 2,
+                                            90, 2, color);
+                        } else if (command.kind == COMMAND_VOLLEY) {
+                            DrawCircle(target_pos.x, target_pos.y, hex_radius / 4, color);
+                        }
                     }
                 }
             }
         }
 
-
-
-        // If hovering, show preview of actions for any piece.
-        // If one is selected, show possible actions.
-
-
-//        if (selected_piece) {
-//            Piece selected_piece = *board_at(&game, selected_cpos);
-//            for (uint64_t i = 0; i < actions.len; i++) {
-//                Action action = actions.e[i];
-//                if (selected_piece.player == game.active_player && action.piece == selected_piece.kind &&
-//                    action.piece_id == selected_piece.id) {
-//                    DPos target_dpos = dpos_from_cpos(action.target);
-//                    Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
-//                                                    game_center.y + vertical_offset * target_dpos.y};
-//                    //DrawCircleV(target_pos, hex_radius / 4, GREEN);
-//                    DrawPolyLinesEx(target_pos, 6, hex_radius - 1,
-//                                    90, 4, RAYWHITE);
-//                }
-//            }
-//        } else {
-//            CPos highlighted_cpos = cpos_from_dpos(hilighted_hex);
-//            Piece highlighted_piece = *board_at(&game, highlighted_cpos);
-//            for (uint64_t i = 0; i < actions.len; i++) {
-//                Action action = actions.e[i];
-//                if (highlighted_piece.player == game.active_player && action.piece == highlighted_piece.kind &&
-//                    action.piece_id == highlighted_piece.id) {
-//                    DPos target_dpos = dpos_from_cpos(action.target);
-//                    Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
-//                                                    game_center.y + vertical_offset * target_dpos.y};
-//                    //DrawCircleV(target_pos, hex_radius / 4, GREEN);
-////                    DrawPolyLinesEx(target_pos, 6, hex_radius - 1,
-////                                    90, 4, RAYWHITE);
-//                    DrawPolyLinesEx(target_pos, 6, hex_radius - 2,
-//                                    90, 2, MAROON);
-//                }
-//            }
-//        }
-
-
-
-
-
-
-//        for (int i = 0; i < gesturesCount; i++) {
-//            if (i % 2 == 0) DrawRectangle(10, 30 + 20 * i, 200, 20, Fade(LIGHTGRAY, 0.5f));
-//            else DrawRectangle(10, 30 + 20 * i, 200, 20, Fade(LIGHTGRAY, 0.3f));
-//
-//            if (i < gesturesCount - 1) DrawText(gestureStrings[i], 35, 36 + 20 * i, 10, DARKGRAY);
-//            else DrawText(gestureStrings[i], 35, 36 + 20 * i, 10, MAROON);
-//        }
-
-
-
-        //if (currentGesture != GESTURE_NONE) DrawCircleV(touchPosition, 30, MAROON);
-
         EndDrawing();
-
-        //Vector2 touchPosition = {0, 0};
-        //Rectangle touchArea = {220, 10, screenWidth - 230.0f, screenHeight - 20.0f};
-
-        //int gesturesCount = 0;
-        //char gestureStrings[MAX_GESTURE_STRINGS][32];
-
-        //int currentGesture = GESTURE_NONE;
-        //int lastGesture = GESTURE_NONE;
-
-        //SetGesturesEnabled(0b0000000000001001);   // Enable only some gestures to be detected
-
-//        lastGesture = currentGesture;
-//        currentGesture = GetGestureDetected();
-//        touchPosition = GetTouchPosition(0);
-//
-//        if (CheckCollisionPointRec(touchPosition, touchArea) && (currentGesture != GESTURE_NONE)) {
-//            if (currentGesture != lastGesture) {
-//                // Store gesture string
-//                switch (currentGesture) {
-//                    case GESTURE_TAP:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE TAP");
-//                        break;
-//                    case GESTURE_DOUBLETAP:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE DOUBLETAP");
-//                        break;
-//                    case GESTURE_HOLD:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE HOLD");
-//                        break;
-//                    case GESTURE_DRAG:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE DRAG");
-//                        break;
-//                    case GESTURE_SWIPE_RIGHT:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE SWIPE RIGHT");
-//                        break;
-//                    case GESTURE_SWIPE_LEFT:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE SWIPE LEFT");
-//                        break;
-//                    case GESTURE_SWIPE_UP:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE SWIPE UP");
-//                        break;
-//                    case GESTURE_SWIPE_DOWN:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE SWIPE DOWN");
-//                        break;
-//                    case GESTURE_PINCH_IN:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE PINCH IN");
-//                        break;
-//                    case GESTURE_PINCH_OUT:
-//                        TextCopy(gestureStrings[gesturesCount], "GESTURE PINCH OUT");
-//                        break;
-//                    default:
-//                        break;
-//                }
-//
-//                gesturesCount++;
-//
-//                // Reset gestures strings
-//                if (gesturesCount >= MAX_GESTURE_STRINGS) {
-//                    for (int i = 0; i < MAX_GESTURE_STRINGS; i++) TextCopy(gestureStrings[i], "\0");
-//
-//                    gesturesCount = 0;
-//                }
-//            }
-//        }
-
-
     }
 
     CloseWindow();

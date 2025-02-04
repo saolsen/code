@@ -138,6 +138,7 @@ _Static_assert(sizeof(char) == 1, "char must be 8 bits");
 #define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
 #define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 
 uint64_t pow2_next(uint64_t i);
 
