@@ -174,10 +174,6 @@ int main(void) {
             }
         }
 
-        // ok, so I need just a couple more things.
-        // a selected outline. and an end turn button.
-        // and if there are no actions I can take except for end turn, I should auto end it.
-
         // Draw
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -191,7 +187,15 @@ int main(void) {
 
         // Left Panel
         DrawRectangleRec(left_panel, RAYWHITE);
-        if (game.turn.player == PLAYER_RED) {
+
+        if (game.winner != PLAYER_NONE) {
+            DrawText("GAME OVER", game_area.x + 10, 18, 10, GRAY);
+            if (game.winner == PLAYER_RED) {
+                DrawText("RED WINS", game_area.x + 10, 41, 10, GRAY);
+            } else {
+                DrawText("BLUE WINS", game_area.x + 10, 41, 10, GRAY);
+            }
+        } else if (game.turn.player == PLAYER_RED) {
             DrawText("RED's TURN", game_area.x + 10, 18, 10, GRAY);
         } else {
             DrawText("BLUE's TURN", game_area.x + 10, 18, 10, GRAY);
@@ -199,14 +203,15 @@ int main(void) {
 
         // end turn button
 
-        DrawRectangleRec(end_turn_button, LIGHTGRAY);
-        DrawText("END TURN", game_area.x + 13, 41, 10, RAYWHITE);
-        if (mouse_in_end_turn_button) {
-            DrawRectangleLines(end_turn_button.x, end_turn_button.y, end_turn_button.width, end_turn_button.height,
-                               PINK);
-            DrawText("END TURN", game_area.x + 13, 41, 10, PINK);
+        if (game.winner == PLAYER_NONE) {
+            DrawRectangleRec(end_turn_button, LIGHTGRAY);
+            DrawText("END TURN", game_area.x + 13, 41, 10, RAYWHITE);
+            if (mouse_in_end_turn_button) {
+                DrawRectangleLines(end_turn_button.x, end_turn_button.y, end_turn_button.width, end_turn_button.height,
+                                   PINK);
+                DrawText("END TURN", game_area.x + 13, 41, 10, PINK);
+            }
         }
-
 
         // Right Panel
         DrawRectangleRec(right_panel, RAYWHITE);

@@ -549,6 +549,30 @@ void game_apply_command(Arena *a, Game *game, Player player, Command command) {
         }
         game->turn.activation_i = 0;
     }
+
+    // Check for game over.
+    int red_crowns = 0;
+    int blue_crowns = 0;
+    for (int r = -4; r <= 4; r++) {
+        for (int q = -4; q <= 4; q++) {
+            CPos cpos = {q, r, -q - r};
+            Piece *p = board_at(game, cpos);
+            if (p->kind == PIECE_CROWN) {
+                if (p->player == PLAYER_RED) {
+                    red_crowns++;
+                } else if (p->player == PLAYER_BLUE) {
+                    blue_crowns++;
+                }
+            }
+        }
+    }
+    if (red_crowns == 0) {
+        game->status = STATUS_OVER;
+        game->winner = PLAYER_BLUE;
+    } else if (blue_crowns == 0) {
+        game->status = STATUS_OVER;
+        game->winner = PLAYER_RED;
+    }
 }
 
 // Valid moves for each piece, taking into account it's strength.
