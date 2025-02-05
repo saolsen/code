@@ -13,7 +13,7 @@ add_library(compile-options INTERFACE)
 if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(compile-options INTERFACE -Wall -Wextra -Wconversion)# -Werror)
 elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(compile-options INTERFACE /TC /W4 /wd4200 /WX)  # c mode, disable error from flexible array member.
+    target_compile_options(compile-options INTERFACE /TC /W4 /wd4200)  # /WX
 endif ()
 
 # Enable AddressSanitizer in debug mode when using Clang on linux or macos.
@@ -49,25 +49,29 @@ if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "
     add_test(NAME bigints COMMAND bigints)
 endif ()
 
-include(FetchContent)
-set(FETCHCONTENT_QUIET FALSE)
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
-set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
+# Raylib stuff is only working for a few platforms right now.
 
-FetchContent_Declare(
-        raylib
-        GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
-        GIT_TAG "master"
-        GIT_PROGRESS TRUE
-)
-FetchContent_MakeAvailable(raylib)
+if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"))))
+    include(FetchContent)
+    set(FETCHCONTENT_QUIET FALSE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
+    set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
 
-add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
-target_include_directories(tazar PRIVATE ../3rdparty/bestline)
-target_include_directories(tazar PRIVATE ..)
-target_link_libraries(tazar PRIVATE compile-options raylib)
+    FetchContent_Declare(
+            raylib
+            GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
+            GIT_TAG "master"
+            GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
+    target_include_directories(tazar PRIVATE ../3rdparty/bestline)
+    target_include_directories(tazar PRIVATE ..)
+    target_link_libraries(tazar PRIVATE compile-options raylib)
+endif ()
 
 #add_library(bestline ../3rdparty/bestline/bestline.c)
 #target_link_libraries(tazar compile-options bestline)
