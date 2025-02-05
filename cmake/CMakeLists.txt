@@ -67,7 +67,7 @@ if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (NOT ((CMAKE_SYSTEM_NAME STREQU
     )
     FetchContent_MakeAvailable(raylib)
 
-    add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
+    add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ai.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
     target_include_directories(tazar PRIVATE ../3rdparty/bestline)
     target_include_directories(tazar PRIVATE ..)
     target_link_libraries(tazar PRIVATE compile-options raylib)

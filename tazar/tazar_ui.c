@@ -189,8 +189,7 @@ int ui_main(void) {
             } else {
                 // Choose next command.
                 // First hacky ai, just pick a random command.
-                int ai_command_selected = GetRandomValue(0, commands.len - 1);
-                chosen_ai_command = commands.e[ai_command_selected];
+                chosen_ai_command = ai_select_command_random(&game, commands);
                 selected_piece_id = chosen_ai_command.piece_id;
                 ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }

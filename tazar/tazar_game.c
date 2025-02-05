@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 DPos dpos_from_cpos(CPos cpos) {
     int x = 2 * cpos.q + cpos.r;
@@ -429,7 +430,6 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
     return (CommandSlice) arr_slice(commands);
 }
 
-#include <stdio.h>
 
 void game_apply_command(Arena *a, Game *game, Player player, Command command) {
     if (game->turn.player != player) {
