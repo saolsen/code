@@ -13,12 +13,12 @@ typedef struct {
     int s;
 } CPos;
 
-#define CPOS_RIGHT_UP (CPos){1,-1,0}
-#define CPOS_RIGHT (CPos){1,0,-1}
-#define CPOS_RIGHT_DOWN (CPos){0,1,-1}
-#define CPOS_LEFT_DOWN (CPos){-1,1,0}
-#define CPOS_LEFT (CPos){-1,0,1}
-#define CPOS_LEFT_UP (CPos){0,-1,1}
+#define CPOS_RIGHT_UP (CPos){1, -1, 0}
+#define CPOS_RIGHT (CPos){1, 0, -1}
+#define CPOS_RIGHT_DOWN (CPos){0, 1, -1}
+#define CPOS_LEFT_DOWN (CPos){-1, 1, 0}
+#define CPOS_LEFT (CPos){-1, 0, 1}
+#define CPOS_LEFT_UP (CPos){0, -1, 1}
 
 bool cpos_eq(CPos a, CPos b);
 
@@ -95,6 +95,8 @@ typedef struct {
     Turn turn;
 } Game;
 
+Piece *board_at(Game *game, CPos pos);
+
 void game_init_attrition_hex_field_small(Game *game);
 
 // commands are you telling the game what to do. these are the things to generate I think.
@@ -121,15 +123,6 @@ CommandSlice game_valid_commands(Arena *a, Game *game);
 
 void game_apply_command(Arena *a, Game *game, Player player, Command command);
 
+int ui_main();
 
-
-//typedef Slice(Action) ActionSlice;
-//typedef Array(Action) ActionArray;
-
-// Apply an action.
-// Returns an error message if the action is invalid.
-//String game_apply_action(Arena *a, Game *game, Player player, Action action);
-
-//ActionSlice game_valid_actions(Arena *a, Game *game);
-
-#endif //TAZAR_H
+#endif // TAZAR_H

@@ -384,12 +384,10 @@ StringSlice str_split(Arena *a, String s, char sep);
 
 #if defined(_WIN64)
 // Windows
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 // @note(steve): Must include Windows.h first.
 #include <Memoryapi.h>
-
-// todo(steve): For future msvc, can I set a pragma or whatever to link kernal32.lib?
-// #pragma comment(lib, "kernel32.lib")
 
 static size_t memory__page_size(void) {
     SYSTEM_INFO sys_info;
@@ -428,7 +426,7 @@ static void memory__free(uint8_t *addr) {
 #include <unistd.h>
 
 static size_t memory__page_size(void) {
-    return (size_t) sysconf(_SC_PAGE_SIZE);
+    return (size_t)sysconf(_SC_PAGE_SIZE);
 }
 
 static uint8_t *memory__reserve(size_t size) {
@@ -487,7 +485,7 @@ Arena *arena_new(void) {
     // Allocate a new arena.
     size_t pagesize = memory__page_size(); // 16kb on my machine.
     size_t cap =
-            pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
+        pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
 
     uint8_t *addr = memory__reserve(cap);
     memory__commit(addr, pagesize); // commit first page
@@ -498,7 +496,7 @@ Arena *arena_new(void) {
 #endif
 #endif
 
-    Arena *arena = (Arena *) addr;
+    Arena *arena = (Arena *)addr;
     arena->begin = addr;
     arena->pos = addr + sizeof(*arena);
     arena->commit = addr + pagesize;
@@ -579,7 +577,7 @@ void scratch_free(void) {
 
 uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align) {
     // Align Pointer
-    uint8_t *start = (uint8_t *) ALIGN_UP_PTR(arena->pos, align);
+    uint8_t *start = (uint8_t *)ALIGN_UP_PTR(arena->pos, align);
     uint8_t *new_pos = start + size;
 
 #if defined(__has_feature)
@@ -595,7 +593,7 @@ uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align) {
         while (new_pos > new_commit) {
             new_commit += pagesize;
         }
-        memory__commit(arena->commit, (size_t) (new_commit - arena->commit));
+        memory__commit(arena->commit, (size_t)(new_commit - arena->commit));
         arena->commit = new_commit;
     }
     arena->pos = new_pos;
@@ -613,14 +611,14 @@ uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align) {
 // arena_serialize.
 size_t arena_size(Arena *arena) {
     ptrdiff_t buf_span = arena->pos - arena->begin;
-    assert((size_t) buf_span >= sizeof(Arena));
-    return (size_t) buf_span - sizeof(Arena);
+    assert((size_t)buf_span >= sizeof(Arena));
+    return (size_t)buf_span - sizeof(Arena);
 }
 
 void arena_serialize(void *buf, Arena *arena) {
     if (arena->refcount > 0) {
         perror(
-                "arena_serialize: Arena is in use by other functions. You cannot serialize scratch.");
+            "arena_serialize: Arena is in use by other functions. You cannot serialize scratch.");
         exit(1);
     }
     xmemcpy(buf, arena->begin + sizeof(Arena), arena_size(arena));
@@ -649,7 +647,7 @@ uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size) {
 }
 
 U8Array *arena__alloc_array(Arena *arena, size_t item_size, uint64_t cap) {
-    U8Array *array = (U8Array *) arena_alloc_size(arena, sizeof(U8Array) + (item_size * cap), 16);
+    U8Array *array = (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + (item_size * cap), 16);
     array->len = 0;
     array->cap = cap;
     return array;
@@ -665,7 +663,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint6
     }
     if (new_cap > array->cap) {
         // Grow the array
-        if (arena->pos == (uint8_t *) (array->e) + array->cap * item_size) {
+        if (arena->pos == (uint8_t *)(array->e) + array->cap * item_size) {
             // Array is on the end of the arena, we can just grow it.
             arena_alloc_size(arena, (new_cap - array->cap) * item_size, 1);
             array->cap = new_cap;
@@ -701,7 +699,7 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, size_t item_size) {
 }
 
 char *arena__alloc_cstring(Arena *a, String *s) {
-    char *c = (char *) arena_alloc_size(a, s->len + 1, _Alignof(char));
+    char *c = (char *)arena_alloc_size(a, s->len + 1, _Alignof(char));
     xmemcpy(c, s->e, s->len);
     c[s->len] = '\0';
     return c;
@@ -712,12 +710,12 @@ String str_format(Arena *a, const char *fmt, ...) {
     va_start(args, fmt);
     va_list args_copy;
     va_copy(args_copy, args);
-    size_t len = (size_t) vsnprintf(NULL, 0, fmt, args_copy);
+    size_t len = (size_t)vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
-    char *c = (char *) arena_alloc_size(a, len + 1, _Alignof(char));
+    char *c = (char *)arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, len + 1, fmt, args);
     va_end(args);
-    return (String) {.len = len, .e = (uint8_t *) c};
+    return (String){.len = len, .e = (uint8_t *)c};
 }
 
 StringSlice str_split(Arena *a, String s, char sep) {
@@ -738,7 +736,7 @@ StringSlice str_split(Arena *a, String s, char sep) {
         }
     }
     if (parts == NULL) {
-        return (StringSlice) {.len = 0, .e = NULL};
+        return (StringSlice){.len = 0, .e = NULL};
     }
     StringSlice result = arr_slice(parts);
     return result;
@@ -834,11 +832,11 @@ static void test_helpers(void) {
 
     {
         ptrdiff_t ptr_val = 15;
-        void *p1 = (void *) ptr_val;
+        void *p1 = (void *)ptr_val;
         void *aligned_up = ALIGN_UP_PTR(p1, 8);
         void *aligned_down = ALIGN_DOWN_PTR(p1, 8);
-        assert((ptrdiff_t) aligned_up == 16);
-        assert((ptrdiff_t) aligned_down == 8);
+        assert((ptrdiff_t)aligned_up == 16);
+        assert((ptrdiff_t)aligned_down == 8);
     }
 }
 
@@ -901,12 +899,12 @@ static void test_arena_alloc_alignment(void) {
     for (int i = 0; i < 4; i++) {
         ptrdiff_t align = alignments[i];
         uint8_t *p = arena_alloc_size(a, 10, align);
-        assert(((ptrdiff_t) p % align) == 0 && "Pointer must be aligned");
+        assert(((ptrdiff_t)p % align) == 0 && "Pointer must be aligned");
     }
 
     // Cross page boundary test
     size_t pagesize = memory__page_size();
-    (void) arena_alloc_size(a, pagesize + 1, 16);
+    (void)arena_alloc_size(a, pagesize + 1, 16);
 
     arena_free(a);
 }
@@ -928,7 +926,7 @@ static void test_rel_ptr(void) {
     int *x = arena_alloc(a, int);
     *x = 55;
     ptrdiff_t offset = rel(a, x);
-    int *y = (int *) ptr(a, offset);
+    int *y = (int *)ptr(a, offset);
     assert(x == y);
     assert(*y == 55);
 
@@ -1016,7 +1014,7 @@ static void test_dynamic_arrays(void) {
     arr = NULL;
     for (int32_t i = 0; i < 10; i++) {
         arr_push(a, arr, i);
-        assert(arr->len == (uint64_t) i + 1);
+        assert(arr->len == (uint64_t)i + 1);
         for (int32_t j = 0; j <= i; j++) {
             assert(arr->e[j] == j);
         }
@@ -1030,7 +1028,7 @@ static void test_dynamic_arrays(void) {
     assert(arr->len == 110);
 
     // arr_push_slice
-    I32Slice slice = {.len = 3, .e = (int32_t[]) {999, 1000, 1001}};
+    I32Slice slice = {.len = 3, .e = (int32_t[]){999, 1000, 1001}};
     arr_push_slice(a, arr, slice);
     assert(arr->len == 113);
     assert(arr->e[110] == 999);
@@ -1088,8 +1086,8 @@ static void test_arena_serialize(void) {
     I32Array *arr_copy = ptr(copy, arr_rel);
     I32Slice s_copy = slice_ptr(copy, s_rel);
     assert(arr_copy != arr);
-    assert((ptrdiff_t) arr_copy >= (ptrdiff_t) copy->begin);
-    assert((ptrdiff_t) arr_copy <= (ptrdiff_t) (copy->begin + size));
+    assert((ptrdiff_t)arr_copy >= (ptrdiff_t)copy->begin);
+    assert((ptrdiff_t)arr_copy <= (ptrdiff_t)(copy->begin + size));
     assert(s_copy.len == 10);
     assert(s_copy.e == arr_copy->e);
     assert(arr_copy->len == 10);
@@ -1104,8 +1102,8 @@ static void test_arena_serialize(void) {
     arr_copy = ptr(copy2, arr_rel);
     I32Slice s_copy2 = slice_ptr(copy2, s_rel);
     assert(arr_copy != arr);
-    assert((ptrdiff_t) arr_copy >= (ptrdiff_t) copy2->begin);
-    assert((ptrdiff_t) arr_copy <= (ptrdiff_t) (copy2->begin + size));
+    assert((ptrdiff_t)arr_copy >= (ptrdiff_t)copy2->begin);
+    assert((ptrdiff_t)arr_copy <= (ptrdiff_t)(copy2->begin + size));
     assert(s_copy2.len == 10);
     assert(s_copy2.e == arr_copy->e);
     assert(arr_copy->len == 10);
@@ -1125,27 +1123,27 @@ static void test_strings(void) {
     // format
     String s1 = str_format(a, "Hello %d %s", 42, "World");
     assert(s1.len == 14);
-    assert(strncmp((const char *) s1.e, "Hello 42 World", s1.len) == 0);
+    assert(strncmp((const char *)s1.e, "Hello 42 World", s1.len) == 0);
 
     // split
     String s2 = str("apple,banana,cherry");
     StringSlice parts = str_split(a, s2, ',');
     assert(parts.len == 3);
-    assert(strncmp((const char *) parts.e[0].e, "apple", parts.e[0].len) == 0);
-    assert(strncmp((const char *) parts.e[1].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char *) parts.e[2].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "apple", parts.e[0].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[2].e, "cherry", parts.e[2].len) == 0);
 
     String s3 = str(",banana,cherry");
     parts = str_split(a, s3, ',');
     assert(parts.len == 2);
-    assert(strncmp((const char *) parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char *) parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s4 = str("banana,cherry,");
     parts = str_split(a, s4, ',');
     assert(parts.len == 2);
-    assert(strncmp((const char *) parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char *) parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s5 = str(",");
     parts = str_split(a, s5, ',');

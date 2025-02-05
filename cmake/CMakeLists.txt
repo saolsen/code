@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.20)
 project(code C)
 
 set(CMAKE_C_STANDARD 17)
@@ -49,12 +49,14 @@ if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "
     add_test(NAME bigints COMMAND bigints)
 endif ()
 
-add_library(bestline ../3rdparty/bestline/bestline.c)
-
 include(FetchContent)
 set(FETCHCONTENT_QUIET FALSE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
+
+
 FetchContent_Declare(
         raylib
         GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
@@ -63,8 +65,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib)
 
-add_executable(tazar ../tazar/tazar_main.c)
+add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
 target_include_directories(tazar PRIVATE ../3rdparty/bestline)
 target_include_directories(tazar PRIVATE ..)
 target_link_libraries(tazar PRIVATE compile-options raylib)
+
+#add_library(bestline ../3rdparty/bestline/bestline.c)
 #target_link_libraries(tazar compile-options bestline)
