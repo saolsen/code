@@ -45,7 +45,7 @@ int ui_main(void) {
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
     int selected_piece_id = 0;
 
-    int num_ai_turn_lag_frames = 30;
+    int num_ai_turn_lag_frames = 45;
     int ai_turn_lag_frames_left = 0;
     Command chosen_ai_command = {0};
 
@@ -171,25 +171,28 @@ int ui_main(void) {
         }
 
         if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
-            // Apply the command.
             if (chosen_ai_command.kind != COMMAND_NONE) {
+                // Apply the command.
                 game_apply_command(frame_arena, &game, game.turn.player, chosen_ai_command);
                 commands = game_valid_commands(frame_arena, &game);
-            }
 
-            if (game.status == STATUS_OVER) {
-                ui_state = UI_STATE_GAME_OVER;
-            } else {
-                if (game.turn.player == PLAYER_BLUE) {
-                    // First hacky ai, just pick a random command.
-                    int ai_command_selected = GetRandomValue(0, commands.len - 1);
-                    chosen_ai_command = commands.e[ai_command_selected];
-                    selected_piece_id = chosen_ai_command.piece_id;
+                if (game.status == STATUS_OVER) {
+                    ui_state = UI_STATE_GAME_OVER;
+                } else if (game.turn.player == PLAYER_BLUE) {
+                    chosen_ai_command = (Command) {0};
+                    selected_piece_id = 0;
                     ai_turn_lag_frames_left = num_ai_turn_lag_frames;
                 } else {
                     selected_piece_id = 0;
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
+            } else {
+                // Choose next command.
+                // First hacky ai, just pick a random command.
+                int ai_command_selected = GetRandomValue(0, commands.len - 1);
+                chosen_ai_command = commands.e[ai_command_selected];
+                selected_piece_id = chosen_ai_command.piece_id;
+                ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }
         }
 
