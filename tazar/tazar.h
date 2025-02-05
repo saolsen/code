@@ -121,9 +121,11 @@ typedef Array(Command) CommandArray;
 
 CommandSlice game_valid_commands(Arena *a, Game *game);
 
-void game_apply_command(Arena *a, Game *game, Player player, Command command);
+void game_apply_command(Game *game, Player player, Command command);
 
 Command ai_select_command_random(Game *game, CommandSlice commands);
+
+Command ai_select_command_mcts(Game *game, CommandSlice commands);
 
 int ui_main();
 

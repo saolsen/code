@@ -431,7 +431,7 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
 }
 
 
-void game_apply_command(Arena *a, Game *game, Player player, Command command) {
+void game_apply_command(Game *game, Player player, Command command) {
     if (game->turn.player != player) {
         printf("Not %s's turn\n", player == PLAYER_RED ? "Red" : "Blue");
         return;

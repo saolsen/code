@@ -92,7 +92,7 @@ int ui_main(void) {
 
         // Update
         if (mouse_clicked && mouse_in_end_turn_button) {
-            game_apply_command(frame_arena, &game, game.turn.player,
+            game_apply_command(&game, game.turn.player,
                                ((Command) {
                                        .kind = COMMAND_END_TURN,
                                        .piece_id = 0,
@@ -112,7 +112,7 @@ int ui_main(void) {
                     if (command.piece_id == selected_piece_id &&
                         cpos_eq(command.target, mouse_cpos)) {
                         matched_command = true;
-                        game_apply_command(frame_arena, &game, game.turn.player, command);
+                        game_apply_command(&game, game.turn.player, command);
                         commands = game_valid_commands(frame_arena, &game);
                         break;
                     }
@@ -133,7 +133,7 @@ int ui_main(void) {
                     // If there are no more commands for this player, end the turn.
                     if (commands.len == 1) {
                         assert(commands.e[0].kind == COMMAND_END_TURN);
-                        game_apply_command(frame_arena, &game, game.turn.player,
+                        game_apply_command(&game, game.turn.player,
                                            ((Command) {
                                                    .kind = COMMAND_END_TURN,
                                                    .piece_id = 0,
@@ -166,14 +166,14 @@ int ui_main(void) {
         // AI Turn
         if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER && game.turn.player == PLAYER_BLUE) {
             ui_state = UI_STATE_AI_TURN;
-            ai_turn_lag_frames_left = 0;
+            ai_turn_lag_frames_left = 1;
             chosen_ai_command = (Command) {0};
         }
 
         if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
             if (chosen_ai_command.kind != COMMAND_NONE) {
                 // Apply the command.
-                game_apply_command(frame_arena, &game, game.turn.player, chosen_ai_command);
+                game_apply_command(&game, game.turn.player, chosen_ai_command);
                 commands = game_valid_commands(frame_arena, &game);
 
                 if (game.status == STATUS_OVER) {
@@ -189,7 +189,9 @@ int ui_main(void) {
             } else {
                 // Choose next command.
                 // First hacky ai, just pick a random command.
-                chosen_ai_command = ai_select_command_random(&game, commands);
+                //chosen_ai_command = ai_select_command_random(&game, commands);
+
+                chosen_ai_command = ai_select_command_mcts(&game, commands);
                 selected_piece_id = chosen_ai_command.piece_id;
                 ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }
