@@ -20,7 +20,7 @@ int ui_main(void) {
     const int screen_width = 800;
     const int screen_height = 450;
 
-    Rectangle game_area = {220, 10, (float)screen_width - 230.0f, (float)screen_height - 20.0f};
+    Rectangle game_area = {220, 10, (float) screen_width - 230.0f, (float) screen_height - 20.0f};
     Vector2 game_center = {game_area.x + game_area.width / 2, game_area.y + game_area.height / 2};
 
     Rectangle left_panel = {game_area.x + 5, game_area.y + 5, 100, 115};
@@ -71,8 +71,8 @@ int ui_main(void) {
                 }
                 // Check Mouse Position.
                 if (CheckCollisionPointCircle(GetMousePosition(),
-                                              (Vector2){game_center.x + horizontal_offset * dpos.x,
-                                                        game_center.y + vertical_offset * dpos.y},
+                                              (Vector2) {game_center.x + horizontal_offset * dpos.x,
+                                                         game_center.y + vertical_offset * dpos.y},
                                               horizontal_offset)) {
                     mouse_in_board = true;
                     mouse_cpos = cpos;
@@ -83,10 +83,10 @@ int ui_main(void) {
         // Update
         if (mouse_clicked && mouse_in_end_turn_button) {
             game_apply_command(frame_arena, &game, game.turn.player,
-                               ((Command){
-                                   .kind = COMMAND_END_TURN,
-                                   .piece_id = 0,
-                                   .target = (CPos){0, 0, 0},
+                               ((Command) {
+                                       .kind = COMMAND_END_TURN,
+                                       .piece_id = 0,
+                                       .target = (CPos) {0, 0, 0},
                                }));
             commands = game_valid_commands(frame_arena, &game);
             ui_state = UI_STATE_WAITING_FOR_SELECTION;
@@ -104,19 +104,40 @@ int ui_main(void) {
                         matched_command = true;
                         game_apply_command(frame_arena, &game, game.turn.player, command);
                         commands = game_valid_commands(frame_arena, &game);
-                        // We still have it selected, want to unselect it if we can't do any more
-                        // actions with it.
                         break;
                     }
                 }
-                if (true) { //! matched_command) {
+                if (matched_command) {
+                    bool has_another_command = false;
+                    for (uint64_t i = 0; i < commands.len; i++) {
+                        Command command = commands.e[i];
+                        if (command.piece_id == selected_piece_id) {
+                            has_another_command = true;
+                            break;
+                        }
+                    }
+                    if (!has_another_command) {
+                        selected_piece_id = 0;
+                        ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                    }
+                    // If there are no more commands for this player, end the turn.
+                    if (commands.len == 1) {
+                        assert(commands.e[0].kind == COMMAND_END_TURN);
+                        game_apply_command(frame_arena, &game, game.turn.player,
+                                           ((Command) {
+                                                   .kind = COMMAND_END_TURN,
+                                                   .piece_id = 0,
+                                                   .target = (CPos) {0, 0, 0},
+                                           }));
+                        commands = game_valid_commands(frame_arena, &game);
+                        ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                    }
+                } else {
                     selected_piece_id = 0;
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
             }
-        }
-
-        if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
+        } else if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
             if (mouse_clicked && mouse_in_board) {
                 Piece selected_piece = *board_at(&game, mouse_cpos);
                 if (selected_piece.player == game.turn.player) {
@@ -196,8 +217,8 @@ int ui_main(void) {
                     continue;
                 }
 
-                Vector2 screen_pos = (Vector2){game_center.x + (horizontal_offset * dpos.x),
-                                               game_center.y + vertical_offset * dpos.y};
+                Vector2 screen_pos = (Vector2) {game_center.x + (horizontal_offset * dpos.x),
+                                                game_center.y + vertical_offset * dpos.y};
 
                 DrawPoly(screen_pos, 6, hex_radius, 90, LIGHTGRAY);
                 DrawPolyLines(screen_pos, 6, hex_radius, 90, BLACK);
@@ -217,28 +238,28 @@ int ui_main(void) {
                 switch (piece.kind) {
                     case PIECE_CROWN: {
                         DrawTriangle(
-                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                color);
                         DrawTriangle(
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
-                            (Vector2){screen_pos.x, screen_pos.y + hex_radius / 2},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
+                                (Vector2) {screen_pos.x, screen_pos.y + hex_radius / 2},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
+                                color);
                         break;
                     }
                     case PIECE_PIKE:
                         DrawRectangleV(
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
-                            (Vector2){hex_radius, hex_radius}, color);
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
+                                (Vector2) {hex_radius, hex_radius}, color);
                         break;
                     case PIECE_HORSE:
                         DrawTriangle(
-                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                color);
                         break;
                     case PIECE_BOW:
                         DrawCircleV(screen_pos, hex_radius / 2, color);
@@ -254,8 +275,8 @@ int ui_main(void) {
                 if (command.piece_id == selected_piece_id) {
                     DPos target_dpos = dpos_from_cpos(command.target);
                     Vector2 target_pos =
-                        (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
-                                  game_center.y + vertical_offset * target_dpos.y};
+                            (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
+                                       game_center.y + vertical_offset * target_dpos.y};
                     if (command.kind == COMMAND_MOVE) {
                         DrawPolyLinesEx(target_pos, 6, hex_radius - 1, 90, 4, RAYWHITE);
                     } else if (command.kind == COMMAND_VOLLEY) {
@@ -266,7 +287,7 @@ int ui_main(void) {
         }
         if (mouse_in_board) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
-            if ((ui_state != UI_STATE_WAITING_FOR_COMMAND) &&
+            if (!(ui_state == UI_STATE_WAITING_FOR_COMMAND && hovered_piece.id == selected_piece_id) &&
                 !(hovered_piece.kind == PIECE_NONE || hovered_piece.kind == PIECE_EMPTY) &&
                 hovered_piece.player == game.turn.player) {
                 Color color = hovered_piece.player == PLAYER_RED ? MAROON : DARKBLUE;
@@ -276,8 +297,8 @@ int ui_main(void) {
                     if (command.piece_id == hovered_piece.id) {
                         DPos target_dpos = dpos_from_cpos(command.target);
                         Vector2 target_pos =
-                            (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
-                                      game_center.y + vertical_offset * target_dpos.y};
+                                (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
+                                           game_center.y + vertical_offset * target_dpos.y};
                         if (command.kind == COMMAND_MOVE) {
                             DrawPolyLinesEx(target_pos, 6, hex_radius - 2, 90, 2, color);
                         } else if (command.kind == COMMAND_VOLLEY) {

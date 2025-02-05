@@ -357,22 +357,24 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
             if (piece->player != game->turn.player) {
                 continue;
             }
+
+            // Can't use any piece from a previous activation.
+            bool piece_already_used = false;
+            for (int i = 0; i < game->turn.activation_i; i++) {
+                if (game->turn.activations[i].piece_id == piece->id) {
+                    piece_already_used = true;
+                    break;
+                }
+            }
+            if (piece_already_used) {
+                continue;
+            }
+
             bool piece_can_move = true;
             bool piece_can_action = true;
-            if (activation->piece_id == 0) {
-                // This a new activation we could use any piece that
-                // wasn't already used.
-                bool piece_already_used = false;
-                for (int i = 0; i < game->turn.activation_i; i++) {
-                    if (game->turn.activations[i].piece_id == piece->id) {
-                        piece_already_used = true;
-                        break;
-                    }
-                }
-                if (piece_already_used) {
-                    continue;
-                }
-            } else if (activation->piece_id == piece->id) {
+
+            // Can only do orders that we haven't done on a piece from the current activation.
+            if (activation->piece_id == piece->id) {
                 // If piece_id is set we must have done something.
                 assert(activation->order_i > 0);
                 // We can only do any not already done orders.
@@ -383,10 +385,13 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
                         piece_can_action = false;
                     }
                 }
-            } else {
-                // We can't do anything with this piece.
-                continue;
+            } else if (activation->piece_id != 0) {
+                // Can only use a new piece if there are more activations left.
+                if (game->turn.activation_i + 1 >= 2) {
+                    continue;
+                }
             }
+
             if (piece->kind == PIECE_PIKE || piece->kind == PIECE_HORSE) {
                 piece_can_action = false;
             }
