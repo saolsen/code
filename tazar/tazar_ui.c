@@ -310,7 +310,7 @@ int ui_main(void) {
                 }
             }
         }
-        //if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
+        
         for (uint64_t i = 0; i < commands.len; i++) {
             Command command = commands.e[i];
             if (command.piece_id == selected_piece_id) {
@@ -325,7 +325,7 @@ int ui_main(void) {
                 }
             }
         }
-        //}
+
         if (mouse_in_board && ui_state != UI_STATE_GAME_OVER && ui_state != UI_STATE_AI_TURN) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
             if (!(ui_state == UI_STATE_WAITING_FOR_COMMAND && hovered_piece.id == selected_piece_id) &&

@@ -75,6 +75,7 @@ Command ai_select_command_mcts(Game *game, CommandSlice commands) {
     DoubleArray *scores = NULL;
     arr_setlen(scratch, scores, commands.len);
 
+    // Bigger depth makes the ai a lot smarter. Going to use lots of rollouts with a high depth for training in RL.
     for (uint64_t i = 0; i < commands.len; i++) {
         Game rollout_game = *game;
         double score = ai_rollout(&rollout_game, commands.e[i], 300, 20);

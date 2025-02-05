@@ -271,8 +271,7 @@ CPosSlice volley_targets(Arena *a, Game *game, CPos from) {
     }
 }
 
-
-CPosSlice move_targets(Arena *a, Game *game, CPos from) {
+int move_targets(CPos *targets, int max_targets, Game *game, CPos from) {
     Piece *piece = board_at(game, from);
     int movement = piece_movement(piece->kind);
     int max_strength = piece_strength(piece->kind) - 1;
@@ -281,19 +280,25 @@ CPosSlice move_targets(Arena *a, Game *game, CPos from) {
     }
     // todo: pending response from the bros, max_strength for crown might be 0.
 
-    CPosArray *visited = NULL;
-    arr_push(a, visited, from);
+    CPos visited[64];
+    int visited_len = 0;
+    visited[visited_len++] = from;
 
-    uint64_t i = 0;
+    int i = 0;
     for (int steps = 0; steps < movement; steps++) {
-        uint64_t current_len = visited->len;
+        int current_len = visited_len;
         for (; i < current_len; i++) {
-            CPos current = visited->e[i];
+            CPos current = visited[i];
             Piece *current_piece = board_at(game, current);
             // Check if this is a valid piece to keep searching from.
-            if (!(cpos_eq(current, from) || current_piece->kind == PIECE_EMPTY)) {
+            if (!(current_piece->kind == PIECE_EMPTY || cpos_eq(current, from))) {
                 continue;
             }
+            // Instead of expanding neighbors at each piece, we should expand a whole level at once, that way
+            // we don't keep checking and not continuing from the same pieces over and over.
+            // The problem with that, is that we don't want to go through walls. So we'd have to check
+            // neighbors anyway to find one that is in visited. Is that faster than this? I think so.
+            // eh, I'm not sure actually.
             CPos neighbors[6] = {
                     cpos_add(current, CPOS_RIGHT_UP),
                     cpos_add(current, CPOS_RIGHT),
@@ -305,8 +310,8 @@ CPosSlice move_targets(Arena *a, Game *game, CPos from) {
             for (int n = 0; n < 6; n++) {
                 CPos neighbor = neighbors[n];
                 bool already_checked = false;
-                for (uint64_t j = 0; j < visited->len; j++) {
-                    if (cpos_eq(visited->e[j], neighbor)) {
+                for (int j = 0; j < visited_len; j++) {
+                    if (cpos_eq(visited[j], neighbor)) {
                         already_checked = true;
                         break;
                     }
@@ -321,16 +326,18 @@ CPosSlice move_targets(Arena *a, Game *game, CPos from) {
                 }
                 if (neighbor_piece->player != piece->player &&
                     piece_strength(neighbor_piece->kind) <= max_strength) {
-                    arr_push(a, visited, neighbor);
+                    visited[visited_len++] = neighbor;
                 }
             }
         }
     }
-    CPosSlice result = arr_slice(visited);
-    // Drop the first one because it's the starting position.
-    result.len--;
-    result.e++;
-    return result;
+
+    // Skip first target since it's the starting position.
+    assert(visited_len <= max_targets);
+    for (int t = 1; t < visited_len; t++) {
+        targets[t - 1] = visited[t];
+    }
+    return visited_len - 1;
 }
 
 
@@ -395,9 +402,10 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
             }
 
             if (piece_can_move) {
-                CPosSlice targets = move_targets(scratch, game, cpos);
-                for (uint64_t i = 0; i < targets.len; i++) {
-                    CPos target = targets.e[i];
+                CPos targets[64];
+                int targets_len = move_targets(&(targets[0]), 64, game, cpos);
+                for (int i = 0; i < targets_len; i++) {
+                    CPos target = targets[i];
                     arr_push(a, commands, ((Command) {
                             .kind = COMMAND_MOVE,
                             .piece_id = piece->id,
