@@ -2,6 +2,7 @@
 #include "tazar.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 DPos dpos_from_cpos(CPos cpos) {
     int x = 2 * cpos.q + cpos.r;
@@ -509,8 +510,14 @@ void game_apply_command(Arena *a, Game *game, Player player, Command command) {
                 return;
             }
             order_kind = ORDER_VOLLEY;
-            aquired_gold = piece_gold(target_piece->kind);
-            new_target_piece = (Piece) {.kind = PIECE_EMPTY, .player = PLAYER_NONE, .id = 0};
+            // todo: better random number generation.
+            int die_1 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
+            int die_2 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
+            int roll = die_1 + die_2;
+            if (roll < 7) {
+                aquired_gold = piece_gold(target_piece->kind);
+                new_target_piece = (Piece) {.kind = PIECE_EMPTY, .player = PLAYER_NONE, .id = 0};
+            }
             break;
         }
         default: {
