@@ -11,6 +11,8 @@ typedef enum {
     UI_STATE_NONE,
     UI_STATE_WAITING_FOR_SELECTION,
     UI_STATE_WAITING_FOR_COMMAND,
+    UI_STATE_AI_TURN,
+    UI_STATE_GAME_OVER,
 } UIState;
 
 int ui_main(void) {
@@ -43,6 +45,10 @@ int ui_main(void) {
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
     int selected_piece_id = 0;
 
+    int num_ai_turn_lag_frames = 30;
+    int ai_turn_lag_frames_left = 0;
+    Command chosen_ai_command = {0};
+
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
 
@@ -55,6 +61,10 @@ int ui_main(void) {
         bool mouse_in_board = false;
         CPos mouse_cpos = {0, 0, 0};
         bool mouse_clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+        if (game.status == STATUS_OVER) {
+            ui_state = UI_STATE_GAME_OVER;
+        }
 
         // Process Input
         for (int row = 0; row <= 8; row++) {
@@ -153,6 +163,36 @@ int ui_main(void) {
             }
         }
 
+        // AI Turn
+        if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER && game.turn.player == PLAYER_BLUE) {
+            ui_state = UI_STATE_AI_TURN;
+            ai_turn_lag_frames_left = 0;
+            chosen_ai_command = (Command) {0};
+        }
+
+        if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
+            // Apply the command.
+            if (chosen_ai_command.kind != COMMAND_NONE) {
+                game_apply_command(frame_arena, &game, game.turn.player, chosen_ai_command);
+                commands = game_valid_commands(frame_arena, &game);
+            }
+
+            if (game.status == STATUS_OVER) {
+                ui_state = UI_STATE_GAME_OVER;
+            } else {
+                if (game.turn.player == PLAYER_BLUE) {
+                    // First hacky ai, just pick a random command.
+                    int ai_command_selected = GetRandomValue(0, commands.len - 1);
+                    chosen_ai_command = commands.e[ai_command_selected];
+                    selected_piece_id = chosen_ai_command.piece_id;
+                    ai_turn_lag_frames_left = num_ai_turn_lag_frames;
+                } else {
+                    selected_piece_id = 0;
+                    ui_state = UI_STATE_WAITING_FOR_SELECTION;
+                }
+            }
+        }
+
         // Draw
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -187,7 +227,7 @@ int ui_main(void) {
 
         // end turn button
 
-        if (game.winner == PLAYER_NONE) {
+        if (ui_state == UI_STATE_WAITING_FOR_COMMAND || ui_state == UI_STATE_WAITING_FOR_SELECTION) {
             DrawRectangleRec(end_turn_button, LIGHTGRAY);
             DrawText("END TURN", game_area.x + 13, 41, 10, RAYWHITE);
             if (mouse_in_end_turn_button) {
@@ -231,7 +271,7 @@ int ui_main(void) {
                     color = PINK; // draw pink for invalid stuff, helps with debugging.
                 }
 
-                if (ui_state == UI_STATE_WAITING_FOR_COMMAND && piece.id == selected_piece_id) {
+                if (/*ui_state == UI_STATE_WAITING_FOR_COMMAND && */piece.id == selected_piece_id) {
                     color = RAYWHITE;
                 }
 
@@ -269,23 +309,23 @@ int ui_main(void) {
                 }
             }
         }
-        if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
-            for (uint64_t i = 0; i < commands.len; i++) {
-                Command command = commands.e[i];
-                if (command.piece_id == selected_piece_id) {
-                    DPos target_dpos = dpos_from_cpos(command.target);
-                    Vector2 target_pos =
-                            (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
-                                       game_center.y + vertical_offset * target_dpos.y};
-                    if (command.kind == COMMAND_MOVE) {
-                        DrawPolyLinesEx(target_pos, 6, hex_radius - 1, 90, 4, RAYWHITE);
-                    } else if (command.kind == COMMAND_VOLLEY) {
-                        DrawCircle(target_pos.x, target_pos.y, hex_radius / 4, RAYWHITE);
-                    }
+        //if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
+        for (uint64_t i = 0; i < commands.len; i++) {
+            Command command = commands.e[i];
+            if (command.piece_id == selected_piece_id) {
+                DPos target_dpos = dpos_from_cpos(command.target);
+                Vector2 target_pos =
+                        (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
+                                   game_center.y + vertical_offset * target_dpos.y};
+                if (command.kind == COMMAND_MOVE) {
+                    DrawPolyLinesEx(target_pos, 6, hex_radius - 1, 90, 4, RAYWHITE);
+                } else if (command.kind == COMMAND_VOLLEY) {
+                    DrawCircle(target_pos.x, target_pos.y, hex_radius / 4, RAYWHITE);
                 }
             }
         }
-        if (mouse_in_board) {
+        //}
+        if (mouse_in_board && ui_state != UI_STATE_GAME_OVER && ui_state != UI_STATE_AI_TURN) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
             if (!(ui_state == UI_STATE_WAITING_FOR_COMMAND && hovered_piece.id == selected_piece_id) &&
                 !(hovered_piece.kind == PIECE_NONE || hovered_piece.kind == PIECE_EMPTY) &&
