@@ -26,11 +26,7 @@ CPos cpos_add(CPos a, CPos b) {
     return (CPos) {a.q + b.q, a.r + b.r, a.s + b.s};
 }
 
-static Piece piece_null = (Piece) {
-        .kind = PIECE_NONE,
-        .player = PLAYER_NONE,
-        .id = 0,
-};
+static Piece piece_null = {0};
 
 // @note: Hardcoded to "Hex Field Small".
 Piece *board_at(Game *game, CPos pos) {

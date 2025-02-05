@@ -184,13 +184,10 @@ int ui_main(void) {
                     ai_turn_lag_frames_left = num_ai_turn_lag_frames;
                 } else {
                     selected_piece_id = 0;
+                    mouse_in_board = false; // hack because AI blocks and mouse could have moved.
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
             } else {
-                // Choose next command.
-                // First hacky ai, just pick a random command.
-                //chosen_ai_command = ai_select_command_random(&game, commands);
-
                 chosen_ai_command = ai_select_command_mcts(&game, commands);
                 selected_piece_id = chosen_ai_command.piece_id;
                 ai_turn_lag_frames_left = num_ai_turn_lag_frames;
