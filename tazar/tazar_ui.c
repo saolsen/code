@@ -15,6 +15,12 @@ typedef enum {
     UI_STATE_GAME_OVER,
 } UIState;
 
+typedef enum {
+    DIFFICULTY_EASY,
+    DIFFICULTY_MEDIUM,
+    DIFFICULTY_HARD,
+} Difficulty;
+
 int ui_main(void) {
     Game game;
     game_init_attrition_hex_field_small(&game);
@@ -28,6 +34,10 @@ int ui_main(void) {
     Rectangle left_panel = {game_area.x + 10, game_area.y + 10, 150, 200};
     Rectangle right_panel = {game_area.x + game_area.width - 160, game_area.y + 10, 150, 200};
     Rectangle end_turn_button = {game_area.x + 20, 72, 100, 30};
+
+    Rectangle diff_easy_button = {right_panel.x + 10, right_panel.y + 40, 130, 25};
+    Rectangle diff_medium_button = {right_panel.x + 10, right_panel.y + 70, 130, 25};
+    Rectangle diff_hard_button = {right_panel.x + 10, right_panel.y + 100, 130, 25};
 
     float hexes_across = 12.0f;
     float hex_radius = floorf(game_area.width * sqrtf(3.0f) / (3 * hexes_across));
@@ -49,6 +59,8 @@ int ui_main(void) {
     int ai_turn_lag_frames_left = 0;
     Command chosen_ai_command = {0};
 
+    Difficulty current_difficulty = DIFFICULTY_MEDIUM;
+
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
 
@@ -61,6 +73,10 @@ int ui_main(void) {
         bool mouse_in_board = false;
         CPos mouse_cpos = {0, 0, 0};
         bool mouse_clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+        bool mouse_in_easy = CheckCollisionPointRec(GetMousePosition(), diff_easy_button);
+        bool mouse_in_medium = CheckCollisionPointRec(GetMousePosition(), diff_medium_button);
+        bool mouse_in_hard = CheckCollisionPointRec(GetMousePosition(), diff_hard_button);
 
         if (game.status == STATUS_OVER) {
             ui_state = UI_STATE_GAME_OVER;
@@ -88,6 +104,12 @@ int ui_main(void) {
                     mouse_cpos = cpos;
                 }
             }
+        }
+
+        if (mouse_clicked) {
+            if (mouse_in_easy) current_difficulty = DIFFICULTY_EASY;
+            if (mouse_in_medium) current_difficulty = DIFFICULTY_MEDIUM;
+            if (mouse_in_hard) current_difficulty = DIFFICULTY_HARD;
         }
 
         // Update
@@ -188,7 +210,17 @@ int ui_main(void) {
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
             } else {
-                chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
+                switch (current_difficulty) {
+                    case DIFFICULTY_EASY:
+                        chosen_ai_command = ai_select_command_random(&game, commands);
+                        break;
+                    case DIFFICULTY_MEDIUM:
+                        chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
+                        break;
+                    default:
+                        chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
+                        break;
+                }
                 selected_piece_id = chosen_ai_command.piece_id;
                 ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }
@@ -240,7 +272,30 @@ int ui_main(void) {
 
         // Right Panel
         DrawRectangleRec(right_panel, RAYWHITE);
-        DrawText("OPTIONS", game_area.x + game_area.width - 150, 36, 16, GRAY);
+        DrawText("DIFFICULTY", game_area.x + game_area.width - 150, 36, 16, GRAY);
+
+        // Difficulty buttons
+        Color easy_color = (current_difficulty == DIFFICULTY_EASY) ? DARKGRAY : LIGHTGRAY;
+        Color medium_color = (current_difficulty == DIFFICULTY_MEDIUM) ? DARKGRAY : LIGHTGRAY;
+        Color hard_color = (current_difficulty == DIFFICULTY_HARD) ? DARKGRAY : LIGHTGRAY;
+
+        DrawRectangleRec(diff_easy_button, easy_color);
+        DrawRectangleRec(diff_medium_button, medium_color);
+        DrawRectangleRec(diff_hard_button, hard_color);
+
+        DrawText("Easy   (RAND)", diff_easy_button.x + 10, diff_easy_button.y + 5, 16, RAYWHITE);
+        DrawText("Medium ( MC )", diff_medium_button.x + 10, diff_medium_button.y + 5, 16, RAYWHITE);
+        DrawText("Hard   (MCTS)", diff_hard_button.x + 10, diff_hard_button.y + 5, 16, RAYWHITE);
+
+        if (mouse_in_easy)
+            DrawRectangleLines(diff_easy_button.x, diff_easy_button.y,
+                               diff_easy_button.width, diff_easy_button.height, PINK);
+        if (mouse_in_medium)
+            DrawRectangleLines(diff_medium_button.x, diff_medium_button.y,
+                               diff_medium_button.width, diff_medium_button.height, PINK);
+        if (mouse_in_hard)
+            DrawRectangleLines(diff_hard_button.x, diff_hard_button.y,
+                               diff_hard_button.width, diff_hard_button.height, PINK);
 
         // Game Board
         // @note: Hardcoded to hex field small.
