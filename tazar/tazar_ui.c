@@ -28,7 +28,7 @@ int ui_main(void) {
     const int screen_width = 1024;
     const int screen_height = 768;
 
-    Rectangle game_area = {280, 20, (float)screen_width - 300.0f, (float)screen_height - 40.0f};
+    Rectangle game_area = {280, 20, (float) screen_width - 300.0f, (float) screen_height - 40.0f};
     Vector2 game_center = {game_area.x + game_area.width / 2, game_area.y + game_area.height / 2};
 
     Rectangle left_panel = {game_area.x + 10, game_area.y + 10, 150, 200};
@@ -59,7 +59,10 @@ int ui_main(void) {
     int ai_turn_lag_frames_left = 0;
     Command chosen_ai_command = {0};
 
-    Difficulty current_difficulty = DIFFICULTY_MEDIUM;
+    Difficulty current_difficulty = DIFFICULTY_HARD;
+
+    Arena *ai_arena = arena_new();
+    void *ai_state = NULL;
 
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
@@ -97,8 +100,8 @@ int ui_main(void) {
                 }
                 // Check Mouse Position.
                 if (CheckCollisionPointCircle(GetMousePosition(),
-                                              (Vector2){game_center.x + horizontal_offset * dpos.x,
-                                                        game_center.y + vertical_offset * dpos.y},
+                                              (Vector2) {game_center.x + horizontal_offset * dpos.x,
+                                                         game_center.y + vertical_offset * dpos.y},
                                               horizontal_offset)) {
                     mouse_in_board = true;
                     mouse_cpos = cpos;
@@ -118,10 +121,10 @@ int ui_main(void) {
         // Update
         if (mouse_clicked && mouse_in_end_turn_button) {
             game_apply_command(&game, game.turn.player,
-                               ((Command){
-                                   .kind = COMMAND_END_TURN,
-                                   .piece_id = 0,
-                                   .target = (CPos){0, 0, 0},
+                               ((Command) {
+                                       .kind = COMMAND_END_TURN,
+                                       .piece_id = 0,
+                                       .target = (CPos) {0, 0, 0},
                                }));
             commands = game_valid_commands(frame_arena, &game);
             ui_state = UI_STATE_WAITING_FOR_SELECTION;
@@ -159,10 +162,10 @@ int ui_main(void) {
                     if (commands.len == 1) {
                         assert(commands.e[0].kind == COMMAND_END_TURN);
                         game_apply_command(&game, game.turn.player,
-                                           ((Command){
-                                               .kind = COMMAND_END_TURN,
-                                               .piece_id = 0,
-                                               .target = (CPos){0, 0, 0},
+                                           ((Command) {
+                                                   .kind = COMMAND_END_TURN,
+                                                   .piece_id = 0,
+                                                   .target = (CPos) {0, 0, 0},
                                            }));
                         commands = game_valid_commands(frame_arena, &game);
                         ui_state = UI_STATE_WAITING_FOR_SELECTION;
@@ -193,7 +196,7 @@ int ui_main(void) {
             game.turn.player == PLAYER_BLUE) {
             ui_state = UI_STATE_AI_TURN;
             ai_turn_lag_frames_left = 1;
-            chosen_ai_command = (Command){0};
+            chosen_ai_command = (Command) {0};
         }
 
         if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
@@ -205,7 +208,7 @@ int ui_main(void) {
                 if (game.status == STATUS_OVER) {
                     ui_state = UI_STATE_GAME_OVER;
                 } else if (game.turn.player == PLAYER_BLUE) {
-                    chosen_ai_command = (Command){0};
+                    chosen_ai_command = (Command) {0};
                     selected_piece_id = 0;
                     ai_turn_lag_frames_left = num_ai_turn_lag_frames;
                 } else {
@@ -221,8 +224,8 @@ int ui_main(void) {
                     case DIFFICULTY_MEDIUM:
                         chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
                         break;
-                    default:
-                        chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
+                    case DIFFICULTY_HARD:
+                        chosen_ai_command = ai_select_command_mcts(ai_arena, &ai_state, &game, commands);
                         break;
                 }
                 selected_piece_id = chosen_ai_command.piece_id;
@@ -288,9 +291,9 @@ int ui_main(void) {
         DrawRectangleRec(diff_medium_button, medium_color);
         DrawRectangleRec(diff_hard_button, hard_color);
 
-        DrawText("Easy RAND", diff_easy_button.x + 10, diff_easy_button.y + 5, 19, RAYWHITE);
-        DrawText("Mid  MC", diff_medium_button.x + 10, diff_medium_button.y + 5, 19, RAYWHITE);
-        DrawText("Hard MCTS", diff_hard_button.x + 10, diff_hard_button.y + 5, 19, RAYWHITE);
+        DrawText("Very Easy", diff_easy_button.x + 10, diff_easy_button.y + 5, 19, RAYWHITE);
+        DrawText("Medium", diff_medium_button.x + 10, diff_medium_button.y + 5, 19, RAYWHITE);
+        DrawText("Hard", diff_hard_button.x + 10, diff_hard_button.y + 5, 19, RAYWHITE);
 
         if (mouse_in_easy)
             DrawRectangleLines(diff_easy_button.x, diff_easy_button.y, diff_easy_button.width,
@@ -318,8 +321,8 @@ int ui_main(void) {
                     continue;
                 }
 
-                Vector2 screen_pos = (Vector2){game_center.x + (horizontal_offset * dpos.x),
-                                               game_center.y + vertical_offset * dpos.y};
+                Vector2 screen_pos = (Vector2) {game_center.x + (horizontal_offset * dpos.x),
+                                                game_center.y + vertical_offset * dpos.y};
 
                 DrawPoly(screen_pos, 6, hex_radius, 90, LIGHTGRAY);
                 DrawPolyLines(screen_pos, 6, hex_radius, 90, BLACK);
@@ -333,35 +336,35 @@ int ui_main(void) {
                 }
 
                 if (/*ui_state == UI_STATE_WAITING_FOR_COMMAND && */ piece.id ==
-                    selected_piece_id) {
+                                                                     selected_piece_id) {
                     color = RAYWHITE;
                 }
 
                 switch (piece.kind) {
                     case PIECE_CROWN: {
                         DrawTriangle(
-                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                color);
                         DrawTriangle(
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
-                            (Vector2){screen_pos.x, screen_pos.y + hex_radius / 2},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
+                                (Vector2) {screen_pos.x, screen_pos.y + hex_radius / 2},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
+                                color);
                         break;
                     }
                     case PIECE_PIKE:
                         DrawRectangleV(
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
-                            (Vector2){hex_radius, hex_radius}, color);
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
+                                (Vector2) {hex_radius, hex_radius}, color);
                         break;
                     case PIECE_HORSE:
                         DrawTriangle(
-                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
-                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                            color);
+                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
+                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                                color);
                         break;
                     case PIECE_BOW:
                         DrawCircleV(screen_pos, hex_radius / 2, color);
@@ -376,8 +379,8 @@ int ui_main(void) {
             Command command = commands.e[i];
             if (command.piece_id == selected_piece_id) {
                 DPos target_dpos = dpos_from_cpos(command.target);
-                Vector2 target_pos = (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
-                                               game_center.y + vertical_offset * target_dpos.y};
+                Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
+                                                game_center.y + vertical_offset * target_dpos.y};
                 if (command.kind == COMMAND_MOVE) {
                     DrawPolyLinesEx(target_pos, 6, hex_radius - 1, 90, 4, RAYWHITE);
                 } else if (command.kind == COMMAND_VOLLEY) {
@@ -399,8 +402,8 @@ int ui_main(void) {
                     if (command.piece_id == hovered_piece.id) {
                         DPos target_dpos = dpos_from_cpos(command.target);
                         Vector2 target_pos =
-                            (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
-                                      game_center.y + vertical_offset * target_dpos.y};
+                                (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
+                                           game_center.y + vertical_offset * target_dpos.y};
                         if (command.kind == COMMAND_MOVE) {
                             DrawPolyLinesEx(target_pos, 6, hex_radius - 2, 90, 2, color);
                         } else if (command.kind == COMMAND_VOLLEY) {
@@ -415,7 +418,3 @@ int ui_main(void) {
     CloseWindow();
     return 0;
 }
-
-// I will need to port this to javascript or something soon so that I can let Luke and Kevin play
-// against it. I think I want to keep the AI code in c though, which will mean poting it to wasm
-// probably. I think it would also be best for it to run in a web worker.

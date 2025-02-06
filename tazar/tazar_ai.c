@@ -100,35 +100,53 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
 // and then backpropagate the results.
 // This way the search is targeted towards promising moves instead of uniform over all moves.
 
-typedef struct MCTSNode {
-    Game state;
-    Command move;         // Move that led to this state (or an "empty" move at root)
-    int visits;
-    double totalReward;
-    struct MCTSNode **children;
-    int numChildren;
-    int numUntriedMoves;
-    CommandSlice untriedMoves;
-    struct MCTSNode *parent;
-} MCTSNode;
+// If we wanna re-use the tree across turns, which we do, it'd be nice to have an easy way to prune it. Drop all nodes
+// not referenced by the root and re-use that memory for new nodes.
 
 typedef enum {
     NODE_MOVE,
     NODE_ROLL, // volley rolls.
 } NodeKind;
 
-// Tree nodes.
 typedef struct {
     Game game;
-    NodeKind kind;
     Command command;
-    int visits;
+} NodeInfo;
+
+typedef struct {
+    NodeKind kind;      // this is literally a single bit of information, waste.
+    uint32_t parent_i;
+    uint32_t first_child_i;
+    uint32_t num_children;
+    uint32_t visits;
     double total_reward;
-    // pointers to child nodes.
-    CommandSlice untried_moves;
-    // pointer to parent. Where we came from via a move or a roll.
 } Node;
 
+typedef Array(NodeInfo) NodeInfoArray;
+typedef Array(Node) NodeArray;
+
+typedef struct {
+    uint32_t root;
+    NodeArray *nodes;
+    NodeInfoArray *nodes_info;
+} MCTSState;
+
+Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
+    MCTSState *mcts;
+    if (*ai_state == NULL) {
+        mcts = arena_alloc(arena, MCTSState);
+        *ai_state = mcts;
+    } else {
+        mcts = (MCTSState *) *ai_state;
+    }
+
+    return (Command) {.kind = COMMAND_END_TURN, .piece_id = 0, .target = (CPos) {0, 0, 0}};
+}
+
+// Tree nodes.
+// Wanna optimize the size of these as much as I can so we can have a lot per cache line.
+// Traversing them happens most during selection and backprop, so stuff we need for only for expansion shouldn't be in here.
+// Traversing down you do look at every child, so makes sense to have those allocated together.
 
 // so, the next step is reinforcement learning.
 // For this, I think I need a fixed command space.

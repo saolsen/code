@@ -127,6 +127,8 @@ Command ai_select_command_random(Game *game, CommandSlice commands);
 
 Command ai_select_command_random_rollouts(Game *game, CommandSlice commands);
 
+Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands);
+
 int ui_main();
 
 #endif // TAZAR_H
