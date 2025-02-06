@@ -19,15 +19,15 @@ int ui_main(void) {
     Game game;
     game_init_attrition_hex_field_small(&game);
 
-    const int screen_width = 800;
-    const int screen_height = 450;
+    const int screen_width = 1024;
+    const int screen_height = 768;
 
-    Rectangle game_area = {220, 10, (float) screen_width - 230.0f, (float) screen_height - 20.0f};
+    Rectangle game_area = {280, 20, (float) screen_width - 300.0f, (float) screen_height - 40.0f};
     Vector2 game_center = {game_area.x + game_area.width / 2, game_area.y + game_area.height / 2};
 
-    Rectangle left_panel = {game_area.x + 5, game_area.y + 5, 100, 115};
-    Rectangle right_panel = {game_area.x + game_area.width - 105, game_area.y + 5, 100, 115};
-    Rectangle end_turn_button = {game_area.x + 10, 36, 60, 20};
+    Rectangle left_panel = {game_area.x + 10, game_area.y + 10, 150, 200};
+    Rectangle right_panel = {game_area.x + game_area.width - 160, game_area.y + 10, 150, 200};
+    Rectangle end_turn_button = {game_area.x + 20, 72, 100, 30};
 
     float hexes_across = 12.0f;
     float hex_radius = floorf(game_area.width * sqrtf(3.0f) / (3 * hexes_across));
@@ -199,12 +199,12 @@ int ui_main(void) {
         ClearBackground(RAYWHITE);
 
         // Actions List (todo)
-        DrawRectangleLines(10, 29, 200, screen_height - 39, GRAY);
-        DrawText("ACTIONS", 12, 15, 10, GRAY);
+        DrawRectangleLines(20, 58, 240, screen_height - 78, GRAY);
+        DrawText("ACTIONS", 24, 30, 16, GRAY);
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
-            DrawText("SELECT COMMAND", 12, 35, 10, GRAY);
+            DrawText("SELECT COMMAND", 24, 70, 16, GRAY);
         } else if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
-            DrawText("SELECT PIECE", 12, 35, 10, GRAY);
+            DrawText("SELECT PIECE", 24, 70, 16, GRAY);
         }
 
         // Game View
@@ -214,33 +214,33 @@ int ui_main(void) {
         DrawRectangleRec(left_panel, RAYWHITE);
 
         if (game.winner != PLAYER_NONE) {
-            DrawText("GAME OVER", game_area.x + 10, 18, 10, GRAY);
+            DrawText("GAME OVER", game_area.x + 20, 36, 16, GRAY);
             if (game.winner == PLAYER_RED) {
-                DrawText("RED WINS", game_area.x + 10, 41, 10, GRAY);
+                DrawText("RED WINS", game_area.x + 20, 82, 16, GRAY);
             } else {
-                DrawText("BLUE WINS", game_area.x + 10, 41, 10, GRAY);
+                DrawText("BLUE WINS", game_area.x + 20, 82, 16, GRAY);
             }
         } else if (game.turn.player == PLAYER_RED) {
-            DrawText("RED's TURN", game_area.x + 10, 18, 10, GRAY);
+            DrawText("RED's TURN", game_area.x + 20, 36, 16, GRAY);
         } else {
-            DrawText("BLUE's TURN", game_area.x + 10, 18, 10, GRAY);
+            DrawText("BLUE's TURN", game_area.x + 20, 36, 16, GRAY);
         }
 
         // end turn button
 
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND || ui_state == UI_STATE_WAITING_FOR_SELECTION) {
             DrawRectangleRec(end_turn_button, LIGHTGRAY);
-            DrawText("END TURN", game_area.x + 13, 41, 10, RAYWHITE);
+            DrawText("END TURN", game_area.x + 26, 82, 16, RAYWHITE);
             if (mouse_in_end_turn_button) {
                 DrawRectangleLines(end_turn_button.x, end_turn_button.y, end_turn_button.width,
                                    end_turn_button.height, PINK);
-                DrawText("END TURN", game_area.x + 13, 41, 10, PINK);
+                DrawText("END TURN", game_area.x + 26, 82, 16, PINK);
             }
         }
 
         // Right Panel
         DrawRectangleRec(right_panel, RAYWHITE);
-        DrawText("OPTIONS", game_area.x + game_area.width - 100, 18, 10, GRAY);
+        DrawText("OPTIONS", game_area.x + game_area.width - 150, 36, 16, GRAY);
 
         // Game Board
         // @note: Hardcoded to hex field small.
