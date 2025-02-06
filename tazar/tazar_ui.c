@@ -28,16 +28,16 @@ int ui_main(void) {
     const int screen_width = 1024;
     const int screen_height = 768;
 
-    Rectangle game_area = {280, 20, (float) screen_width - 300.0f, (float) screen_height - 40.0f};
+    Rectangle game_area = {280, 20, (float)screen_width - 300.0f, (float)screen_height - 40.0f};
     Vector2 game_center = {game_area.x + game_area.width / 2, game_area.y + game_area.height / 2};
 
     Rectangle left_panel = {game_area.x + 10, game_area.y + 10, 150, 200};
     Rectangle right_panel = {game_area.x + game_area.width - 160, game_area.y + 10, 150, 200};
-    Rectangle end_turn_button = {game_area.x + 20, 72, 100, 30};
+    Rectangle end_turn_button = {game_area.x + 15, 72, 135, 30};
 
-    Rectangle diff_easy_button = {right_panel.x + 10, right_panel.y + 40, 130, 25};
-    Rectangle diff_medium_button = {right_panel.x + 10, right_panel.y + 70, 130, 25};
-    Rectangle diff_hard_button = {right_panel.x + 10, right_panel.y + 100, 130, 25};
+    Rectangle diff_easy_button = {right_panel.x + 5, right_panel.y + 40, 135, 25};
+    Rectangle diff_medium_button = {right_panel.x + 5, right_panel.y + 70, 135, 25};
+    Rectangle diff_hard_button = {right_panel.x + 5, right_panel.y + 100, 135, 25};
 
     float hexes_across = 12.0f;
     float hex_radius = floorf(game_area.width * sqrtf(3.0f) / (3 * hexes_across));
@@ -97,8 +97,8 @@ int ui_main(void) {
                 }
                 // Check Mouse Position.
                 if (CheckCollisionPointCircle(GetMousePosition(),
-                                              (Vector2) {game_center.x + horizontal_offset * dpos.x,
-                                                         game_center.y + vertical_offset * dpos.y},
+                                              (Vector2){game_center.x + horizontal_offset * dpos.x,
+                                                        game_center.y + vertical_offset * dpos.y},
                                               horizontal_offset)) {
                     mouse_in_board = true;
                     mouse_cpos = cpos;
@@ -107,18 +107,21 @@ int ui_main(void) {
         }
 
         if (mouse_clicked) {
-            if (mouse_in_easy) current_difficulty = DIFFICULTY_EASY;
-            if (mouse_in_medium) current_difficulty = DIFFICULTY_MEDIUM;
-            if (mouse_in_hard) current_difficulty = DIFFICULTY_HARD;
+            if (mouse_in_easy)
+                current_difficulty = DIFFICULTY_EASY;
+            if (mouse_in_medium)
+                current_difficulty = DIFFICULTY_MEDIUM;
+            if (mouse_in_hard)
+                current_difficulty = DIFFICULTY_HARD;
         }
 
         // Update
         if (mouse_clicked && mouse_in_end_turn_button) {
             game_apply_command(&game, game.turn.player,
-                               ((Command) {
-                                       .kind = COMMAND_END_TURN,
-                                       .piece_id = 0,
-                                       .target = (CPos) {0, 0, 0},
+                               ((Command){
+                                   .kind = COMMAND_END_TURN,
+                                   .piece_id = 0,
+                                   .target = (CPos){0, 0, 0},
                                }));
             commands = game_valid_commands(frame_arena, &game);
             ui_state = UI_STATE_WAITING_FOR_SELECTION;
@@ -156,10 +159,10 @@ int ui_main(void) {
                     if (commands.len == 1) {
                         assert(commands.e[0].kind == COMMAND_END_TURN);
                         game_apply_command(&game, game.turn.player,
-                                           ((Command) {
-                                                   .kind = COMMAND_END_TURN,
-                                                   .piece_id = 0,
-                                                   .target = (CPos) {0, 0, 0},
+                                           ((Command){
+                                               .kind = COMMAND_END_TURN,
+                                               .piece_id = 0,
+                                               .target = (CPos){0, 0, 0},
                                            }));
                         commands = game_valid_commands(frame_arena, &game);
                         ui_state = UI_STATE_WAITING_FOR_SELECTION;
@@ -186,10 +189,11 @@ int ui_main(void) {
         }
 
         // AI Turn
-        if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER && game.turn.player == PLAYER_BLUE) {
+        if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER &&
+            game.turn.player == PLAYER_BLUE) {
             ui_state = UI_STATE_AI_TURN;
             ai_turn_lag_frames_left = 1;
-            chosen_ai_command = (Command) {0};
+            chosen_ai_command = (Command){0};
         }
 
         if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
@@ -201,7 +205,7 @@ int ui_main(void) {
                 if (game.status == STATUS_OVER) {
                     ui_state = UI_STATE_GAME_OVER;
                 } else if (game.turn.player == PLAYER_BLUE) {
-                    chosen_ai_command = (Command) {0};
+                    chosen_ai_command = (Command){0};
                     selected_piece_id = 0;
                     ai_turn_lag_frames_left = num_ai_turn_lag_frames;
                 } else {
@@ -232,11 +236,11 @@ int ui_main(void) {
 
         // Actions List (todo)
         DrawRectangleLines(20, 58, 240, screen_height - 78, GRAY);
-        DrawText("ACTIONS", 24, 30, 16, GRAY);
+        DrawText("ACTIONS", 24, 30, 19, GRAY);
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
-            DrawText("SELECT COMMAND", 24, 70, 16, GRAY);
+            DrawText("SELECT COMMAND", 24, 70, 19, GRAY);
         } else if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {
-            DrawText("SELECT PIECE", 24, 70, 16, GRAY);
+            DrawText("SELECT PIECE", 24, 70, 19, GRAY);
         }
 
         // Game View
@@ -246,33 +250,34 @@ int ui_main(void) {
         DrawRectangleRec(left_panel, RAYWHITE);
 
         if (game.winner != PLAYER_NONE) {
-            DrawText("GAME OVER", game_area.x + 20, 36, 16, GRAY);
+            DrawText("GAME OVER", game_area.x + 20, 36, 19, GRAY);
             if (game.winner == PLAYER_RED) {
-                DrawText("RED WINS", game_area.x + 20, 82, 16, GRAY);
+                DrawText("RED WINS", game_area.x + 20, 82, 19, GRAY);
             } else {
-                DrawText("BLUE WINS", game_area.x + 20, 82, 16, GRAY);
+                DrawText("BLUE WINS", game_area.x + 20, 82, 19, GRAY);
             }
         } else if (game.turn.player == PLAYER_RED) {
-            DrawText("RED's TURN", game_area.x + 20, 36, 16, GRAY);
+            DrawText("RED's TURN", game_area.x + 20, 36, 19, GRAY);
         } else {
-            DrawText("BLUE's TURN", game_area.x + 20, 36, 16, GRAY);
+            DrawText("BLUE's TURN", game_area.x + 20, 36, 19, GRAY);
         }
 
         // end turn button
 
-        if (ui_state == UI_STATE_WAITING_FOR_COMMAND || ui_state == UI_STATE_WAITING_FOR_SELECTION) {
+        if (ui_state == UI_STATE_WAITING_FOR_COMMAND ||
+            ui_state == UI_STATE_WAITING_FOR_SELECTION) {
             DrawRectangleRec(end_turn_button, LIGHTGRAY);
-            DrawText("END TURN", game_area.x + 26, 82, 16, RAYWHITE);
+            DrawText("END TURN", game_area.x + 26, 82, 19, RAYWHITE);
             if (mouse_in_end_turn_button) {
                 DrawRectangleLines(end_turn_button.x, end_turn_button.y, end_turn_button.width,
                                    end_turn_button.height, PINK);
-                DrawText("END TURN", game_area.x + 26, 82, 16, PINK);
+                DrawText("END TURN", game_area.x + 26, 82, 19, PINK);
             }
         }
 
         // Right Panel
         DrawRectangleRec(right_panel, RAYWHITE);
-        DrawText("DIFFICULTY", game_area.x + game_area.width - 150, 36, 16, GRAY);
+        DrawText("DIFFICULTY", game_area.x + game_area.width - 150, 36, 19, GRAY);
 
         // Difficulty buttons
         Color easy_color = (current_difficulty == DIFFICULTY_EASY) ? DARKGRAY : LIGHTGRAY;
@@ -283,19 +288,19 @@ int ui_main(void) {
         DrawRectangleRec(diff_medium_button, medium_color);
         DrawRectangleRec(diff_hard_button, hard_color);
 
-        DrawText("Easy   (RAND)", diff_easy_button.x + 10, diff_easy_button.y + 5, 16, RAYWHITE);
-        DrawText("Medium ( MC )", diff_medium_button.x + 10, diff_medium_button.y + 5, 16, RAYWHITE);
-        DrawText("Hard   (MCTS)", diff_hard_button.x + 10, diff_hard_button.y + 5, 16, RAYWHITE);
+        DrawText("Easy RAND", diff_easy_button.x + 10, diff_easy_button.y + 5, 19, RAYWHITE);
+        DrawText("Mid  MC", diff_medium_button.x + 10, diff_medium_button.y + 5, 19, RAYWHITE);
+        DrawText("Hard MCTS", diff_hard_button.x + 10, diff_hard_button.y + 5, 19, RAYWHITE);
 
         if (mouse_in_easy)
-            DrawRectangleLines(diff_easy_button.x, diff_easy_button.y,
-                               diff_easy_button.width, diff_easy_button.height, PINK);
+            DrawRectangleLines(diff_easy_button.x, diff_easy_button.y, diff_easy_button.width,
+                               diff_easy_button.height, PINK);
         if (mouse_in_medium)
-            DrawRectangleLines(diff_medium_button.x, diff_medium_button.y,
-                               diff_medium_button.width, diff_medium_button.height, PINK);
+            DrawRectangleLines(diff_medium_button.x, diff_medium_button.y, diff_medium_button.width,
+                               diff_medium_button.height, PINK);
         if (mouse_in_hard)
-            DrawRectangleLines(diff_hard_button.x, diff_hard_button.y,
-                               diff_hard_button.width, diff_hard_button.height, PINK);
+            DrawRectangleLines(diff_hard_button.x, diff_hard_button.y, diff_hard_button.width,
+                               diff_hard_button.height, PINK);
 
         // Game Board
         // @note: Hardcoded to hex field small.
@@ -313,8 +318,8 @@ int ui_main(void) {
                     continue;
                 }
 
-                Vector2 screen_pos = (Vector2) {game_center.x + (horizontal_offset * dpos.x),
-                                                game_center.y + vertical_offset * dpos.y};
+                Vector2 screen_pos = (Vector2){game_center.x + (horizontal_offset * dpos.x),
+                                               game_center.y + vertical_offset * dpos.y};
 
                 DrawPoly(screen_pos, 6, hex_radius, 90, LIGHTGRAY);
                 DrawPolyLines(screen_pos, 6, hex_radius, 90, BLACK);
@@ -327,35 +332,36 @@ int ui_main(void) {
                     color = PINK; // draw pink for invalid stuff, helps with debugging.
                 }
 
-                if (/*ui_state == UI_STATE_WAITING_FOR_COMMAND && */piece.id == selected_piece_id) {
+                if (/*ui_state == UI_STATE_WAITING_FOR_COMMAND && */ piece.id ==
+                    selected_piece_id) {
                     color = RAYWHITE;
                 }
 
                 switch (piece.kind) {
                     case PIECE_CROWN: {
                         DrawTriangle(
-                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
-                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                                color);
+                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
+                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                            color);
                         DrawTriangle(
-                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
-                                (Vector2) {screen_pos.x, screen_pos.y + hex_radius / 2},
-                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
-                                color);
+                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 4},
+                            (Vector2){screen_pos.x, screen_pos.y + hex_radius / 2},
+                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y - hex_radius / 4},
+                            color);
                         break;
                     }
                     case PIECE_PIKE:
                         DrawRectangleV(
-                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
-                                (Vector2) {hex_radius, hex_radius}, color);
+                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y - hex_radius / 2},
+                            (Vector2){hex_radius, hex_radius}, color);
                         break;
                     case PIECE_HORSE:
                         DrawTriangle(
-                                (Vector2) {screen_pos.x, screen_pos.y - hex_radius / 2},
-                                (Vector2) {screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
-                                (Vector2) {screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
-                                color);
+                            (Vector2){screen_pos.x, screen_pos.y - hex_radius / 2},
+                            (Vector2){screen_pos.x - hex_radius / 2, screen_pos.y + hex_radius / 4},
+                            (Vector2){screen_pos.x + hex_radius / 2, screen_pos.y + hex_radius / 4},
+                            color);
                         break;
                     case PIECE_BOW:
                         DrawCircleV(screen_pos, hex_radius / 2, color);
@@ -370,9 +376,8 @@ int ui_main(void) {
             Command command = commands.e[i];
             if (command.piece_id == selected_piece_id) {
                 DPos target_dpos = dpos_from_cpos(command.target);
-                Vector2 target_pos =
-                        (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
-                                   game_center.y + vertical_offset * target_dpos.y};
+                Vector2 target_pos = (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
+                                               game_center.y + vertical_offset * target_dpos.y};
                 if (command.kind == COMMAND_MOVE) {
                     DrawPolyLinesEx(target_pos, 6, hex_radius - 1, 90, 4, RAYWHITE);
                 } else if (command.kind == COMMAND_VOLLEY) {
@@ -383,7 +388,8 @@ int ui_main(void) {
 
         if (mouse_in_board && ui_state != UI_STATE_GAME_OVER && ui_state != UI_STATE_AI_TURN) {
             Piece hovered_piece = *board_at(&game, mouse_cpos);
-            if (!(ui_state == UI_STATE_WAITING_FOR_COMMAND && hovered_piece.id == selected_piece_id) &&
+            if (!(ui_state == UI_STATE_WAITING_FOR_COMMAND &&
+                  hovered_piece.id == selected_piece_id) &&
                 !(hovered_piece.kind == PIECE_NONE || hovered_piece.kind == PIECE_EMPTY) &&
                 hovered_piece.player == game.turn.player) {
                 Color color = hovered_piece.player == PLAYER_RED ? MAROON : DARKBLUE;
@@ -393,8 +399,8 @@ int ui_main(void) {
                     if (command.piece_id == hovered_piece.id) {
                         DPos target_dpos = dpos_from_cpos(command.target);
                         Vector2 target_pos =
-                                (Vector2) {game_center.x + (horizontal_offset * target_dpos.x),
-                                           game_center.y + vertical_offset * target_dpos.y};
+                            (Vector2){game_center.x + (horizontal_offset * target_dpos.x),
+                                      game_center.y + vertical_offset * target_dpos.y};
                         if (command.kind == COMMAND_MOVE) {
                             DrawPolyLinesEx(target_pos, 6, hex_radius - 2, 90, 2, color);
                         } else if (command.kind == COMMAND_VOLLEY) {
@@ -410,6 +416,6 @@ int ui_main(void) {
     return 0;
 }
 
-// I will need to port this to javascript or something soon so that I can let Luke and Kevin play against it.
-// I think I want to keep the AI code in c though, which will mean poting it to wasm probably. I think it would also be
-// best for it to run in a web worker.
+// I will need to port this to javascript or something soon so that I can let Luke and Kevin play
+// against it. I think I want to keep the AI code in c though, which will mean poting it to wasm
+// probably. I think it would also be best for it to run in a web worker.
