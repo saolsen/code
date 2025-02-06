@@ -188,7 +188,7 @@ int ui_main(void) {
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
             } else {
-                chosen_ai_command = ai_select_command_mcts(&game, commands);
+                chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
                 selected_piece_id = chosen_ai_command.piece_id;
                 ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }
@@ -310,7 +310,7 @@ int ui_main(void) {
                 }
             }
         }
-        
+
         for (uint64_t i = 0; i < commands.len; i++) {
             Command command = commands.e[i];
             if (command.piece_id == selected_piece_id) {
@@ -354,3 +354,7 @@ int ui_main(void) {
     CloseWindow();
     return 0;
 }
+
+// I will need to port this to javascript or something soon so that I can let Luke and Kevin play against it.
+// I think I want to keep the AI code in c though, which will mean poting it to wasm probably. I think it would also be
+// best for it to run in a web worker.

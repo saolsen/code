@@ -125,7 +125,7 @@ void game_apply_command(Game *game, Player player, Command command);
 
 Command ai_select_command_random(Game *game, CommandSlice commands);
 
-Command ai_select_command_mcts(Game *game, CommandSlice commands);
+Command ai_select_command_random_rollouts(Game *game, CommandSlice commands);
 
 int ui_main();
 

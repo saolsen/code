@@ -69,7 +69,7 @@ double ai_rollout(Game *game, Command command, int rollouts, int depth) {
     return avg_score / (double) rollouts;
 }
 
-Command ai_select_command_mcts(Game *game, CommandSlice commands) {
+Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
     Arena *scratch = scratch_acquire();
 
     DoubleArray *scores = NULL;
@@ -78,7 +78,7 @@ Command ai_select_command_mcts(Game *game, CommandSlice commands) {
     // Bigger depth makes the ai a lot smarter. Going to use lots of rollouts with a high depth for training in RL.
     for (uint64_t i = 0; i < commands.len; i++) {
         Game rollout_game = *game;
-        double score = ai_rollout(&rollout_game, commands.e[i], 300, 20);
+        double score = ai_rollout(&rollout_game, commands.e[i], 100, 20);
         scores->e[i] = score;
     }
 
@@ -95,3 +95,58 @@ Command ai_select_command_mcts(Game *game, CommandSlice commands) {
     scratch_release();
     return result;
 }
+
+// Next thing to try is MCTS. Where you keep a tree of game states and search through it with simulations that expand it
+// and then backpropagate the results.
+// This way the search is targeted towards promising moves instead of uniform over all moves.
+
+typedef struct MCTSNode {
+    Game state;
+    Command move;         // Move that led to this state (or an "empty" move at root)
+    int visits;
+    double totalReward;
+    struct MCTSNode **children;
+    int numChildren;
+    int numUntriedMoves;
+    CommandSlice untriedMoves;
+    struct MCTSNode *parent;
+} MCTSNode;
+
+typedef enum {
+    NODE_MOVE,
+    NODE_ROLL, // volley rolls.
+} NodeKind;
+
+// Tree nodes.
+typedef struct {
+    Game game;
+    NodeKind kind;
+    Command command;
+    int visits;
+    double total_reward;
+    // pointers to child nodes.
+    CommandSlice untried_moves;
+    // pointer to parent. Where we came from via a move or a roll.
+} Node;
+
+
+// so, the next step is reinforcement learning.
+// For this, I think I need a fixed command space.
+// That is, an array of all possible commands.
+// Instead of refering to the piece by id, I should refer to it by CPos.
+// for each space
+// * You can move to one of the spaces in range
+// * You can volley one of the spaces in range
+// * You can end your turn.
+// Obvously for any game state, most of the commands in this list are illegal. But the fixed command space is important for the RL agent.
+
+// there are 81 spaces in the board array because I store it in a 9x9 grid.
+// (there are in reality only 61 tiles, not 81)
+// the horse can move 4 in each direction, which means if he's in the center he can move to any other space.
+// so that's 60 possible moves
+// there are 18 volley targets per space.
+// there is one end_turn action.
+
+// so that's (60 + 18) * 61 + 1; 4759 possible commands.
+// if we use the full array it's 6319 commands.
+// 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576
