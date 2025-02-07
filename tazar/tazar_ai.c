@@ -17,56 +17,42 @@ Command ai_select_command_random(Game *game, CommandSlice commands) {
     return commands.e[selected];
 }
 
-uint64_t ai_simulate_game(Game *game, int depth) {
+double ai_rollout(Game game, Command command, int depth) {
     Arena *scratch = scratch_acquire();
 
-    while (game->status == STATUS_IN_PROGRESS && depth > 0) {
-        CommandSlice commands = game_valid_commands(scratch, game);
-        Command command = ai_select_command_random(game, commands);
-        game_apply_command(game, game->turn.player, command);
+    Player scoring_player = game.turn.player;
+    Player scoring_opponent = scoring_player == PLAYER_RED ? PLAYER_BLUE : PLAYER_RED;
+    int scoring_player_gold = game.gold[scoring_player];
+    int scoring_opponent_gold = game.gold[scoring_opponent];
+
+    game_apply_command(&game, game.turn.player, command);
+
+    while (game.status == STATUS_IN_PROGRESS && depth > 0) {
+        CommandSlice commands = game_valid_commands(scratch, &game);
+        Command picked_command = ai_select_command_random(&game, commands);
+        game_apply_command(&game, game.turn.player, picked_command);
         depth--;
     }
-
-    scratch_release();
-}
-
-double ai_rollout(Game *game, Command command, int rollouts, int depth) {
-    Arena *scratch = scratch_acquire();
 
     // Gold you would have if you killed every piece.
     int max_gold = 1 * 6 + 4 * 1 + 2 * 3 + 3 * 2;
 
-    Player starting_player = game->turn.player;
-    Player starting_opponent = starting_player == PLAYER_RED ? PLAYER_BLUE : PLAYER_RED;
-    int starting_player_gold = game->gold[starting_player];
-    int starting_opponent_gold = game->gold[starting_opponent];
+    double score = 0.5;
+    int gold_gained = game.gold[scoring_player] - scoring_player_gold;
+    int opponent_gold_gained = game.gold[scoring_opponent] - scoring_opponent_gold;
+    int gold_diff = gold_gained - opponent_gold_gained + max_gold;
+    score = (double) gold_diff / (2 * max_gold);
 
-    // Apply the first command.
-    game_apply_command(game, game->turn.player, command);
-
-    double avg_score = 0.5;
-    for (int i = 0; i < rollouts; i++) {
-        Game sim_game = *game;
-        ai_simulate_game(&sim_game, depth);
-
-        double score = 0.5;
-        int gold_gained = sim_game.gold[starting_player] - starting_player_gold;
-        int opponent_gold_gained = sim_game.gold[starting_opponent] - starting_opponent_gold;
-        int gold_diff = gold_gained - opponent_gold_gained + max_gold;
-        score = (double) gold_diff / (2 * max_gold);
-
-        if (sim_game.status == STATUS_OVER) {
-            if (sim_game.winner == starting_player) {
-                score = 1;
-            } else {
-                score = 0;
-            }
+    if (game.status == STATUS_OVER) {
+        if (game.winner == scoring_player) {
+            score = 1;
+        } else {
+            score = 0;
         }
-        avg_score += score;
     }
 
     scratch_release();
-    return avg_score / (double) rollouts;
+    return score;
 }
 
 Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
@@ -74,18 +60,26 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
 
     DoubleArray *scores = NULL;
     arr_setlen(scratch, scores, commands.len);
+    Player scoring_player = game->turn.player;
 
     // Bigger depth makes the ai a lot smarter. Going to use lots of rollouts with a high depth for training in RL.
     for (uint64_t i = 0; i < commands.len; i++) {
-        Game rollout_game = *game;
-        double score = ai_rollout(&rollout_game, commands.e[i], 100, 20);
-        scores->e[i] = score;
+        double total_score = 0.5;
+        for (int rollout = 0; rollout < 100; rollout++) {
+            Game rollout_game = *game;
+            double score = ai_rollout(rollout_game, commands.e[i], 20);
+            total_score += score;
+        }
+        double avg_score = total_score / 100;
+
+        scores->e[i] = avg_score;
     }
 
     double max_score = 0;
     uint64_t max_score_i = 0;
     for (uint64_t i = 0; i < commands.len; i++) {
-        if (scores->e[i] > max_score) {
+        double s = scores->e[i];
+        if (s > max_score) {
             max_score = scores->e[i];
             max_score_i = i;
         }
@@ -104,6 +98,7 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
 // not referenced by the root and re-use that memory for new nodes.
 
 typedef enum {
+    NODE_NONE,
     NODE_MOVE,
     NODE_ROLL, // volley rolls.
 } NodeKind;
@@ -114,7 +109,7 @@ typedef struct {
 } NodeInfo;
 
 typedef struct {
-    NodeKind kind;      // this is literally a single bit of information, waste.
+    NodeKind kind;      // This is literally a single bit of information, waste.
     uint32_t parent_i;
     uint32_t first_child_i;
     uint32_t num_children;
@@ -131,14 +126,116 @@ typedef struct {
     NodeInfoArray *nodes_info;
 } MCTSState;
 
+// I think I probably want to make this a little more complex.
+// Each frame the AI should be able to think for a certain amount of time.
+// Then after some number of frames, it should be asked to pick a move.
+// Putting the search on a separate thread would make that even easier because then a budget could be in
+// iterations instead of in seconds.
+
 Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
     MCTSState *mcts;
     if (*ai_state == NULL) {
         mcts = arena_alloc(arena, MCTSState);
+        // Initialize index 0 as a zero node.
+        // Makes it so nodes and nodes_info are not NULL so we don't have to check for that.
+        arr_push(arena, mcts->nodes, ((Node) {
+                .kind = NODE_NONE,
+                .parent_i = 0,
+                .first_child_i = 0,
+                .num_children = 0,
+                .visits = 0,
+                .total_reward = 0,
+        }));
+        arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                .game = (Game) {0},
+                .command = (Command) {0},
+        }));
+
+        // Push game and set it as the root node.
+        arr_push(arena, mcts->nodes, ((Node) {
+                .kind = NODE_NONE,
+                .parent_i = 0,
+                .first_child_i = 0,
+                .num_children = 0,
+                .visits = 0,
+                .total_reward = 0,
+        }));
+        arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                .game = *game,
+                .command = (Command) {0},
+        }));
+        mcts->root = 1;
+
+        // expand the root node to start.
+        // the passed in commands are the commands for the root node.
+        Node *root = mcts->nodes->e + mcts->root;
+        NodeInfo *root_node_info = mcts->nodes_info->e + mcts->root;
+        root->first_child_i = mcts->nodes->len;
+        for (int i = 0; i < commands.len; i++) {
+            // todo: deal with volley nodes.
+            Game child_game = root_node_info->game;
+            game_apply_command(&child_game, child_game.turn.player, commands.e[i]);
+            arr_push(arena, mcts->nodes, ((Node) {
+                    .kind = NODE_MOVE,
+                    .parent_i = mcts->root,
+                    .first_child_i = 0,
+                    .num_children = 0,
+                    .visits = 0,
+                    .total_reward = 0,
+            }));
+            arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                    .game = child_game,
+                    .command = commands.e[i],
+            }));
+            root->num_children++;
+        }
+        assert(root->num_children == commands.len);
+
+        // simulate the root.
+        for (int i = 0; i < 100; i++) {
+
+        }
+
         *ai_state = mcts;
     } else {
         mcts = (MCTSState *) *ai_state;
     }
+
+    Node *root = mcts->nodes->e + mcts->root;
+
+
+
+    // a node is "fully expanded" when all it's children have at least 1 visit. When doing selection you stop if
+    // the node you hit isn't fully expanded.
+    // expand a node is to pick the next child that doesn't have a visit.
+    // you simulate that node, which is to do a rollout for it.
+    // - this is when you allocate it's children too.
+    // then it's visit gets updated during backpropigation, and it's now a target for selection (but won't be selected
+    // until it's parent is fully expanded.)
+
+    // So we start by simulating the root node. This allocates it's children and gives it a first visit and value.
+
+
+
+
+    // If game != root game, then we're reusing the tree on a new turn.
+    // Do a bfs to try and find the new root. If we find it set it, otherwise we can start a new tree.
+    // One problem is that we can't really reclaim all the memory from the no longer connected branches.
+    // This is unfortunate, this is the kind of thing that would be good with persistent data structures
+    // and garbage collection. We could do manual garbage collection ourselves if we used a general purpose allocator,
+    // but we're using an arena so we can't do that right now.
+    // Could work to just copy the subtree out of the old arena and reset the old one. I really like that idea actually.
+
+    // First pass at this I'm just gonna throw it away after selecting a move.
+
+    for (int pass = 0; pass < 100; pass++) {
+        // Selection.
+        // Expansion.
+        // Simulation.
+        // Back-Propagation.
+    }
+
+    // Return the command for the child of the root with the most visits.
 
     return (Command) {.kind = COMMAND_END_TURN, .piece_id = 0, .target = (CPos) {0, 0, 0}};
 }
