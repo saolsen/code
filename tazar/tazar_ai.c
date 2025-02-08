@@ -1,6 +1,7 @@
 #include "steve.h"
 #include "tazar.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -16,6 +17,7 @@ Command ai_select_command_random(Game *game, CommandSlice commands) {
     int selected = rand_in_range(0, (int) (commands.len - 1));
     return commands.e[selected];
 }
+
 
 double ai_rollout(Game game, Command command, int depth) {
     Arena *scratch = scratch_acquire();
@@ -62,12 +64,11 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
     arr_setlen(scratch, scores, commands.len);
     Player scoring_player = game->turn.player;
 
-    // Bigger depth makes the ai a lot smarter. Going to use lots of rollouts with a high depth for training in RL.
     for (uint64_t i = 0; i < commands.len; i++) {
         double total_score = 0.5;
         for (int rollout = 0; rollout < 100; rollout++) {
             Game rollout_game = *game;
-            double score = ai_rollout(rollout_game, commands.e[i], 20);
+            double score = ai_rollout(rollout_game, commands.e[i], 300);
             total_score += score;
         }
         double avg_score = total_score / 100;
@@ -90,17 +91,10 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
     return result;
 }
 
-// Next thing to try is MCTS. Where you keep a tree of game states and search through it with simulations that expand it
-// and then backpropagate the results.
-// This way the search is targeted towards promising moves instead of uniform over all moves.
-
-// If we wanna re-use the tree across turns, which we do, it'd be nice to have an easy way to prune it. Drop all nodes
-// not referenced by the root and re-use that memory for new nodes.
-
 typedef enum {
     NODE_NONE,
-    NODE_MOVE,
-    NODE_ROLL, // volley rolls.
+    NODE_IN_PROGRESS,
+    NODE_OVER,
 } NodeKind;
 
 typedef struct {
@@ -109,7 +103,8 @@ typedef struct {
 } NodeInfo;
 
 typedef struct {
-    NodeKind kind;      // This is literally a single bit of information, waste.
+    NodeKind kind;
+    Player player;
     uint32_t parent_i;
     uint32_t first_child_i;
     uint32_t num_children;
@@ -126,34 +121,34 @@ typedef struct {
     NodeInfoArray *nodes_info;
 } MCTSState;
 
-// I think I probably want to make this a little more complex.
-// Each frame the AI should be able to think for a certain amount of time.
-// Then after some number of frames, it should be asked to pick a move.
-// Putting the search on a separate thread would make that even easier because then a budget could be in
-// iterations instead of in seconds.
+Node zero_node = (Node) {
+        .kind = NODE_NONE,
+        .player = PLAYER_NONE,
+        .parent_i = 0,
+        .first_child_i = 0,
+        .num_children = 0,
+        .visits = 0,
+        .total_reward = 0,
+};
+NodeInfo zero_node_info = (NodeInfo) {
+        .game = (Game) {0},
+        .command = (Command) {0},
+};
 
 Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
     MCTSState *mcts;
-    if (*ai_state == NULL) {
+    //if (*ai_state == NULL) {
+    if (true) {
         mcts = arena_alloc(arena, MCTSState);
         // Initialize index 0 as a zero node.
         // Makes it so nodes and nodes_info are not NULL so we don't have to check for that.
-        arr_push(arena, mcts->nodes, ((Node) {
-                .kind = NODE_NONE,
-                .parent_i = 0,
-                .first_child_i = 0,
-                .num_children = 0,
-                .visits = 0,
-                .total_reward = 0,
-        }));
-        arr_push(arena, mcts->nodes_info, ((NodeInfo) {
-                .game = (Game) {0},
-                .command = (Command) {0},
-        }));
+        arr_push(arena, mcts->nodes, zero_node);
+        arr_push(arena, mcts->nodes_info, zero_node_info);
 
         // Push game and set it as the root node.
         arr_push(arena, mcts->nodes, ((Node) {
-                .kind = NODE_NONE,
+                .kind = NODE_IN_PROGRESS,
+                .player = game->turn.player,
                 .parent_i = 0,
                 .first_child_i = 0,
                 .num_children = 0,
@@ -165,80 +160,105 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
                 .command = (Command) {0},
         }));
         mcts->root = 1;
-
-        // expand the root node to start.
-        // the passed in commands are the commands for the root node.
-        Node *root = mcts->nodes->e + mcts->root;
-        NodeInfo *root_node_info = mcts->nodes_info->e + mcts->root;
-        root->first_child_i = mcts->nodes->len;
-        for (int i = 0; i < commands.len; i++) {
-            // todo: deal with volley nodes.
-            Game child_game = root_node_info->game;
-            game_apply_command(&child_game, child_game.turn.player, commands.e[i]);
-            arr_push(arena, mcts->nodes, ((Node) {
-                    .kind = NODE_MOVE,
-                    .parent_i = mcts->root,
-                    .first_child_i = 0,
-                    .num_children = 0,
-                    .visits = 0,
-                    .total_reward = 0,
-            }));
-            arr_push(arena, mcts->nodes_info, ((NodeInfo) {
-                    .game = child_game,
-                    .command = commands.e[i],
-            }));
-            root->num_children++;
-        }
-        assert(root->num_children == commands.len);
-
-        // simulate the root.
-        for (int i = 0; i < 100; i++) {
-
-        }
-
         *ai_state = mcts;
     } else {
         mcts = (MCTSState *) *ai_state;
     }
 
-    Node *root = mcts->nodes->e + mcts->root;
-
-
-
-    // a node is "fully expanded" when all it's children have at least 1 visit. When doing selection you stop if
-    // the node you hit isn't fully expanded.
-    // expand a node is to pick the next child that doesn't have a visit.
-    // you simulate that node, which is to do a rollout for it.
-    // - this is when you allocate it's children too.
-    // then it's visit gets updated during backpropigation, and it's now a target for selection (but won't be selected
-    // until it's parent is fully expanded.)
-
-    // So we start by simulating the root node. This allocates it's children and gives it a first visit and value.
-
-
-
-
-    // If game != root game, then we're reusing the tree on a new turn.
-    // Do a bfs to try and find the new root. If we find it set it, otherwise we can start a new tree.
-    // One problem is that we can't really reclaim all the memory from the no longer connected branches.
-    // This is unfortunate, this is the kind of thing that would be good with persistent data structures
-    // and garbage collection. We could do manual garbage collection ourselves if we used a general purpose allocator,
-    // but we're using an arena so we can't do that right now.
-    // Could work to just copy the subtree out of the old arena and reset the old one. I really like that idea actually.
-
-    // First pass at this I'm just gonna throw it away after selecting a move.
-
-    for (int pass = 0; pass < 100; pass++) {
+    double c = sqrt(2);
+    for (int pass = 0; pass < 10000; pass++) {
         // Selection.
+        uint32_t node_i = mcts->root;
+
+        bool found = false;
+        while (!found) {
+            if (mcts->nodes->e[node_i].kind == NODE_OVER || mcts->nodes->e[node_i].visits == 0) {
+                break;
+            }
+
+            // Select node from children.
+            double highest_uct = -INFINITY;
+            uint32_t highest_uct_i = 0;
+            for (uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
+                 child_i < mcts->nodes->e[node_i].first_child_i + mcts->nodes->e[node_i].num_children; child_i++) {
+                if (mcts->nodes->e[child_i].visits == 0) {
+                    // Unexpanded child.
+                    node_i = child_i;
+                    found = true;
+                    break;
+                } else {
+                    double child_uct =
+                            (mcts->nodes->e[child_i].total_reward / mcts->nodes->e[child_i].visits) +
+                            c * sqrt(log(mcts->nodes->e[node_i].visits) / mcts->nodes->e[child_i].visits);
+                    if (child_uct > highest_uct) {
+                        highest_uct = child_uct;
+                        highest_uct_i = child_i;
+                    }
+                }
+            }
+            if (!found) {
+                // Select the child with the highest uct.
+                node_i = highest_uct_i;
+            }
+        }
+
         // Expansion.
-        // Simulation.
-        // Back-Propagation.
+        if (mcts->nodes->e[node_i].kind != NODE_OVER) {
+            // Create child nodes.
+            CommandSlice commands = game_valid_commands(arena, &mcts->nodes_info->e[node_i].game);
+            mcts->nodes->e[node_i].first_child_i = mcts->nodes->len;
+            for (int i = 0; i < commands.len; i++) {
+                // todo: deal with volley nodes.
+                Game child_game = mcts->nodes_info->e[node_i].game;
+                game_apply_command(&child_game, child_game.turn.player, commands.e[i]);
+                arr_push(arena, mcts->nodes, ((Node) {
+                        .kind = child_game.status == STATUS_IN_PROGRESS ? NODE_IN_PROGRESS : NODE_OVER,
+                        .player = child_game.turn.player,
+                        .parent_i = node_i,
+                        .first_child_i = 0,
+                        .num_children = 0,
+                        .visits = 0,
+                        .total_reward = 0,
+                }));
+                arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                        .game = child_game,
+                        .command = commands.e[i],
+                }));
+                mcts->nodes->e[node_i].num_children++;
+            }
+            assert(mcts->nodes->e[node_i].num_children == commands.len);
+        }
+
+        // simulate node.
+        double score = ai_rollout(mcts->nodes_info->e[node_i].game, (Command) {0}, 300);
+
+        // backprop
+        Player apply_player = mcts->nodes->e[node_i].player;
+        uint32_t apply_i = node_i;
+        while (apply_i != 0) {
+            Node *apply_node = mcts->nodes->e + apply_i;
+            apply_node->visits++;
+            if (apply_player == apply_node->player) {
+                apply_node->total_reward += score;
+            } else {
+                apply_node->total_reward += 1.0 - score;
+            }
+            apply_i = apply_node->parent_i;
+        }
     }
 
-    // Return the command for the child of the root with the most visits.
-
-    return (Command) {.kind = COMMAND_END_TURN, .piece_id = 0, .target = (CPos) {0, 0, 0}};
+    uint32_t most_visits = 0;
+    uint32_t best_child_i = 0;
+    for (uint32_t child_i = mcts->nodes->e[mcts->root].first_child_i;
+         child_i < mcts->nodes->e[mcts->root].first_child_i + mcts->nodes->e[mcts->root].num_children; child_i++) {
+        if (mcts->nodes->e[child_i].visits >= most_visits) {
+            most_visits = mcts->nodes->e[child_i].visits;
+            best_child_i = child_i;
+        }
+    }
+    return mcts->nodes_info->e[best_child_i].command;
 }
+
 
 // Tree nodes.
 // Wanna optimize the size of these as much as I can so we can have a lot per cache line.
