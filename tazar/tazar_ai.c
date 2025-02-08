@@ -140,8 +140,21 @@ NodeInfo zero_node_info = (NodeInfo) {
 
 Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
     MCTSState *mcts;
-    //if (*ai_state == NULL) {
-    if (true) {
+    uint32_t new_root = 0;
+    if (*ai_state != NULL) {
+        // Try and find the new root in the old tree.
+        mcts = (MCTSState *) *ai_state;
+
+        for (uint32_t i = 0; i < mcts->nodes->len; i++) {
+            if (mcts->nodes->e[i].kind == NODE_DECISION && game_eq(&mcts->nodes_info->e[i].game, game)) {
+                new_root = i;
+                break;
+            }
+        }
+    }
+    if (new_root == 0) {
+        printf("reinitializing mcts\n");
+        arena_reset(arena);
         mcts = arena_alloc(arena, MCTSState);
         // Initialize index 0 as a zero node.
         // Makes it so nodes and nodes_info are not NULL so we don't have to check for that.
@@ -165,7 +178,8 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
         mcts->root = 1;
         *ai_state = mcts;
     } else {
-        mcts = (MCTSState *) *ai_state;
+        printf("reusing mcts\n");
+        mcts->root = new_root;
     }
 
     double c = sqrt(2);

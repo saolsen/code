@@ -26,6 +26,39 @@ CPos cpos_add(CPos a, CPos b) {
     return (CPos) {a.q + b.q, a.r + b.r, a.s + b.s};
 }
 
+bool game_eq(Game *a, Game *b) {
+    if (a->status != b->status || a->winner != b->winner) {
+        return false;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (a->gold[i] != b->gold[i]) {
+            return false;
+        }
+    }
+    if (a->turn.player != b->turn.player || a->turn.activation_i != b->turn.activation_i) {
+        return false;
+    }
+    for (int i = 0; i < 2; i++) {
+        if (a->turn.activations[i].piece_id != b->turn.activations[i].piece_id ||
+            a->turn.activations[i].order_i != b->turn.activations[i].order_i) {
+            return false;
+        }
+        for (int j = 0; j < 2; j++) {
+            if (a->turn.activations[i].orders[j].kind != b->turn.activations[i].orders[j].kind ||
+                !cpos_eq(a->turn.activations[i].orders[j].target, b->turn.activations[i].orders[j].target)) {
+                return false;
+            }
+        }
+    }
+    for (int i = 0; i < 81; i++) {
+        if (a->board[i].kind != b->board[i].kind || a->board[i].player != b->board[i].player ||
+            a->board[i].id != b->board[i].id) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static Piece piece_null = {0};
 
 // @note: Hardcoded to "Hex Field Small".

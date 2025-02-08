@@ -95,6 +95,8 @@ typedef struct {
     Turn turn;
 } Game;
 
+bool game_eq(Game *a, Game *b);
+
 Piece *board_at(Game *game, CPos pos);
 
 void game_init_attrition_hex_field_small(Game *game);
