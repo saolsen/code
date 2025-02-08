@@ -27,12 +27,12 @@ double ai_rollout(Game game, Command command, int depth) {
     int scoring_player_gold = game.gold[scoring_player];
     int scoring_opponent_gold = game.gold[scoring_opponent];
 
-    game_apply_command(&game, game.turn.player, command);
+    game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
 
     while (game.status == STATUS_IN_PROGRESS && depth > 0) {
         CommandSlice commands = game_valid_commands(scratch, &game);
         Command picked_command = ai_select_command_random(&game, commands);
-        game_apply_command(&game, game.turn.player, picked_command);
+        game_apply_command(&game, game.turn.player, picked_command, VOLLEY_ROLL);
         depth--;
     }
 
@@ -93,7 +93,8 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
 
 typedef enum {
     NODE_NONE,
-    NODE_IN_PROGRESS,
+    NODE_DECISION,
+    NODE_CHANCE,
     NODE_OVER,
 } NodeKind;
 
@@ -110,6 +111,7 @@ typedef struct {
     uint32_t num_children;
     uint32_t visits;
     double total_reward;
+    double probability;
 } Node;
 
 typedef Array(NodeInfo) NodeInfoArray;
@@ -129,6 +131,7 @@ Node zero_node = (Node) {
         .num_children = 0,
         .visits = 0,
         .total_reward = 0,
+        .probability = 0,
 };
 NodeInfo zero_node_info = (NodeInfo) {
         .game = (Game) {0},
@@ -147,7 +150,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
 
         // Push game and set it as the root node.
         arr_push(arena, mcts->nodes, ((Node) {
-                .kind = NODE_IN_PROGRESS,
+                .kind = NODE_DECISION,
                 .player = game->turn.player,
                 .parent_i = 0,
                 .first_child_i = 0,
@@ -172,30 +175,52 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
 
         bool found = false;
         while (!found) {
+            uint32_t highest_uct_i = 0;
             if (mcts->nodes->e[node_i].kind == NODE_OVER || mcts->nodes->e[node_i].visits == 0) {
                 break;
-            }
-
-            // Select node from children.
-            double highest_uct = -INFINITY;
-            uint32_t highest_uct_i = 0;
-            for (uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
-                 child_i < mcts->nodes->e[node_i].first_child_i + mcts->nodes->e[node_i].num_children; child_i++) {
-                if (mcts->nodes->e[child_i].visits == 0) {
-                    // Unexpanded child.
-                    node_i = child_i;
-                    found = true;
-                    break;
-                } else {
-                    double child_uct =
-                            (mcts->nodes->e[child_i].total_reward / mcts->nodes->e[child_i].visits) +
-                            c * sqrt(log(mcts->nodes->e[node_i].visits) / mcts->nodes->e[child_i].visits);
-                    if (child_uct > highest_uct) {
-                        highest_uct = child_uct;
-                        highest_uct_i = child_i;
+            } else if (mcts->nodes->e[node_i].kind == NODE_DECISION) {
+                // Select node from children.
+                double highest_uct = -INFINITY;
+                for (uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
+                     child_i < mcts->nodes->e[node_i].first_child_i + mcts->nodes->e[node_i].num_children; child_i++) {
+                    if (mcts->nodes->e[child_i].visits == 0) {
+                        // Unexpanded child.
+                        node_i = child_i;
+                        found = true;
+                        break;
+                    } else {
+                        double child_uct =
+                                (mcts->nodes->e[child_i].total_reward / mcts->nodes->e[child_i].visits) +
+                                c * sqrt(log(mcts->nodes->e[node_i].visits) / mcts->nodes->e[child_i].visits);
+                        if (child_uct > highest_uct) {
+                            highest_uct = child_uct;
+                            highest_uct_i = child_i;
+                        }
                     }
                 }
+            } else if (mcts->nodes->e[node_i].kind == NODE_CHANCE) {
+                // Select node from children.
+                double r = (double) rand() / RAND_MAX;  // random value in [0,1)
+                double cumulative = 0.0;
+                for (uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
+                     child_i < mcts->nodes->e[node_i].first_child_i + mcts->nodes->e[node_i].num_children; child_i++) {
+                    if (mcts->nodes->e[child_i].visits == 0) {
+                        // Unexpanded child.
+                        node_i = child_i;
+                        found = true;
+                        break;
+                    } else {
+                        cumulative += mcts->nodes->e[child_i].probability;
+                        if (r < cumulative) {
+                            node_i = child_i;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                assert(false);
             }
+
             if (!found) {
                 // Select the child with the highest uct.
                 node_i = highest_uct_i;
@@ -203,22 +228,31 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
         }
 
         // Expansion.
-        if (mcts->nodes->e[node_i].kind != NODE_OVER) {
+        if (mcts->nodes->e[node_i].kind == NODE_DECISION) {
             // Create child nodes.
             CommandSlice commands = game_valid_commands(arena, &mcts->nodes_info->e[node_i].game);
             mcts->nodes->e[node_i].first_child_i = mcts->nodes->len;
+            if (mcts->nodes->e[node_i].num_children != 0) {
+                printf("why?");
+            }
             for (int i = 0; i < commands.len; i++) {
-                // todo: deal with volley nodes.
                 Game child_game = mcts->nodes_info->e[node_i].game;
-                game_apply_command(&child_game, child_game.turn.player, commands.e[i]);
+                NodeKind kind;
+                if (commands.e[i].kind != COMMAND_VOLLEY) {
+                    game_apply_command(&child_game, child_game.turn.player, commands.e[i], VOLLEY_ROLL);
+                    kind = child_game.status == STATUS_IN_PROGRESS ? NODE_DECISION : NODE_OVER;
+                } else {
+                    kind = NODE_CHANCE;
+                }
                 arr_push(arena, mcts->nodes, ((Node) {
-                        .kind = child_game.status == STATUS_IN_PROGRESS ? NODE_IN_PROGRESS : NODE_OVER,
+                        .kind = kind,
                         .player = child_game.turn.player,
                         .parent_i = node_i,
                         .first_child_i = 0,
                         .num_children = 0,
                         .visits = 0,
                         .total_reward = 0,
+                        .probability = 1,
                 }));
                 arr_push(arena, mcts->nodes_info, ((NodeInfo) {
                         .game = child_game,
@@ -227,6 +261,45 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
                 mcts->nodes->e[node_i].num_children++;
             }
             assert(mcts->nodes->e[node_i].num_children == commands.len);
+        } else if (mcts->nodes->e[node_i].kind == NODE_CHANCE) {
+            assert(mcts->nodes_info->e[node_i].command.kind == COMMAND_VOLLEY);
+            mcts->nodes->e[node_i].first_child_i = mcts->nodes->len;
+
+            Game hit_game = mcts->nodes_info->e[node_i].game;
+            game_apply_command(&hit_game, hit_game.turn.player, mcts->nodes_info->e[node_i].command, VOLLEY_HIT);
+            arr_push(arena, mcts->nodes, ((Node) {
+                    .kind = hit_game.status == STATUS_IN_PROGRESS ? NODE_DECISION : NODE_OVER,
+                    .player = hit_game.turn.player,
+                    .parent_i = node_i,
+                    .first_child_i = 0,
+                    .num_children = 0,
+                    .visits = 0,
+                    .total_reward = 0,
+                    .probability = 0.4167,
+            }));
+            arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                    .game = hit_game,
+                    .command = mcts->nodes_info->e[node_i].command,
+            }));
+            mcts->nodes->e[node_i].num_children++;
+
+            Game miss_game = mcts->nodes_info->e[node_i].game;
+            game_apply_command(&miss_game, miss_game.turn.player, mcts->nodes_info->e[node_i].command, VOLLEY_MISS);
+            arr_push(arena, mcts->nodes, ((Node) {
+                    .kind = miss_game.status == STATUS_IN_PROGRESS ? NODE_DECISION : NODE_OVER,
+                    .player = miss_game.turn.player,
+                    .parent_i = node_i,
+                    .first_child_i = 0,
+                    .num_children = 0,
+                    .visits = 0,
+                    .total_reward = 0,
+                    .probability = 1.0 - 0.4167,
+            }));
+            arr_push(arena, mcts->nodes_info, ((NodeInfo) {
+                    .game = miss_game,
+                    .command = mcts->nodes_info->e[node_i].command,
+            }));
+            mcts->nodes->e[node_i].num_children++;
         }
 
         // simulate node.
@@ -241,7 +314,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
             if (apply_player == apply_node->player) {
                 apply_node->total_reward += score;
             } else {
-                apply_node->total_reward += 1.0 - score;
+                apply_node->total_reward -= score;
             }
             apply_i = apply_node->parent_i;
         }
@@ -258,6 +331,14 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
     }
     return mcts->nodes_info->e[best_child_i].command;
 }
+
+// ok, big changes to make next.
+// model volleys with chance nodes so it can explore what happens in both options.
+// To do that I need to add in an a way to explicitly say if a volley hits or not when applying a command.
+
+
+
+
 
 
 // Tree nodes.

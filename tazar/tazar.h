@@ -121,7 +121,13 @@ typedef Array(Command) CommandArray;
 
 CommandSlice game_valid_commands(Arena *a, Game *game);
 
-void game_apply_command(Game *game, Player player, Command command);
+typedef enum {
+    VOLLEY_ROLL,
+    VOLLEY_HIT,
+    VOLLEY_MISS,
+} VolleyResult;
+
+void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result);
 
 Command ai_select_command_random(Game *game, CommandSlice commands);
 

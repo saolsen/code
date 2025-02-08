@@ -434,8 +434,7 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
     return (CommandSlice) arr_slice(commands);
 }
 
-
-void game_apply_command(Game *game, Player player, Command command) {
+void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result) {
     if (command.kind == COMMAND_NONE) {
         return;
     }
@@ -518,11 +517,25 @@ void game_apply_command(Game *game, Player player, Command command) {
                 return;
             }
             order_kind = ORDER_VOLLEY;
-            // todo: better random number generation.
-            int die_1 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
-            int die_2 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
-            int roll = die_1 + die_2;
-            if (roll < 7) {
+            bool volley_hits;
+            switch (volley_result) {
+                case VOLLEY_HIT: {
+                    volley_hits = true;
+                    break;
+                }
+                case VOLLEY_MISS: {
+                    volley_hits = false;
+                    break;
+                }
+                case VOLLEY_ROLL: {
+                    int die_1 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
+                    int die_2 = 1 + rand() / (RAND_MAX / (6 - 1 + 1) + 1);
+                    int roll = die_1 + die_2;
+                    volley_hits = roll < 7;
+                    break;
+                }
+            }
+            if (volley_hits) {
                 aquired_gold = piece_gold(target_piece->kind);
                 new_target_piece = (Piece) {.kind = PIECE_EMPTY, .player = PLAYER_NONE, .id = 0};
             }

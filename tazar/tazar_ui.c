@@ -125,7 +125,7 @@ int ui_main(void) {
                                        .kind = COMMAND_END_TURN,
                                        .piece_id = 0,
                                        .target = (CPos) {0, 0, 0},
-                               }));
+                               }), VOLLEY_ROLL);
             commands = game_valid_commands(frame_arena, &game);
             ui_state = UI_STATE_WAITING_FOR_SELECTION;
         }
@@ -140,7 +140,7 @@ int ui_main(void) {
                     if (command.piece_id == selected_piece_id &&
                         cpos_eq(command.target, mouse_cpos)) {
                         matched_command = true;
-                        game_apply_command(&game, game.turn.player, command);
+                        game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
                         commands = game_valid_commands(frame_arena, &game);
                         break;
                     }
@@ -166,7 +166,7 @@ int ui_main(void) {
                                                    .kind = COMMAND_END_TURN,
                                                    .piece_id = 0,
                                                    .target = (CPos) {0, 0, 0},
-                                           }));
+                                           }), VOLLEY_ROLL);
                         commands = game_valid_commands(frame_arena, &game);
                         ui_state = UI_STATE_WAITING_FOR_SELECTION;
                     }
@@ -202,7 +202,7 @@ int ui_main(void) {
         if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
             if (chosen_ai_command.kind != COMMAND_NONE) {
                 // Apply the command.
-                game_apply_command(&game, game.turn.player, chosen_ai_command);
+                game_apply_command(&game, game.turn.player, chosen_ai_command, VOLLEY_ROLL);
                 commands = game_valid_commands(frame_arena, &game);
 
                 if (game.status == STATUS_OVER) {
