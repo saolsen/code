@@ -43,10 +43,14 @@ double heuristic_value(Game *game, Player player) {
     if (game->status == STATUS_OVER) {
         if (game->winner == player) {
             player_gold = max_gold;
+            player_value = max_gold;
+            opponent_gold = 0;
             opponent_value = 0;
         } else {
             opponent_gold = max_gold;
-            opponent_value = 0;
+            opponent_value = max_gold;
+            player_gold = 0;
+            player_value = 0;
         }
     }
 
@@ -112,11 +116,6 @@ double ai_rollout(Game game, Command command, int depth) {
     }
 
     double score = heuristic_value(&game, scoring_player);
-//    if (score == 1) {
-//        printf("what?\n");
-//        score = heuristic_value(&game, scoring_player);
-//    }
-
     scratch_release();
     return score;
 }
@@ -209,6 +208,12 @@ NodeInfo zero_node_info = (NodeInfo) {
         .command = (Command) {0},
 };
 
+
+// todo: I feel like this selects end turn a lot and I think that is bias from expanding the tree children in order.
+// like if I select children in order, it makes sense that end turn would have the most visits, because it'll always
+// get explored the most wont it? I kinda need to select children randomly or via policy, and I need to debug print the tree
+// so I can see what's going on.
+
 Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
     MCTSState *mcts;
     uint32_t new_root = 0;
@@ -265,6 +270,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
                 break;
             } else if (mcts->nodes->e[node_i].kind == NODE_DECISION) {
                 // Select node from children.
+                // TODO: use the policy to select unexpanded children.
                 double highest_uct = -INFINITY;
                 for (uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
                      child_i < mcts->nodes->e[node_i].first_child_i + mcts->nodes->e[node_i].num_children; child_i++) {
@@ -317,9 +323,6 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
             // Create child nodes.
             CommandSlice commands = game_valid_commands(arena, &mcts->nodes_info->e[node_i].game);
             mcts->nodes->e[node_i].first_child_i = mcts->nodes->len;
-            if (mcts->nodes->e[node_i].num_children != 0) {
-                printf("why?");
-            }
             for (int i = 0; i < commands.len; i++) {
                 Game child_game = mcts->nodes_info->e[node_i].game;
                 NodeKind kind;
@@ -389,6 +392,12 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
 
         // simulate node.
         double score = ai_rollout(mcts->nodes_info->e[node_i].game, (Command) {0}, 300);
+        double adjusted_score = (score + 46) / (46 * 2);
+
+        if (adjusted_score > 0 && adjusted_score < 1 && (adjusted_score < 0.5 || adjusted_score > 0.5)) {
+            printf("score = %f\n", score);
+            printf("adjusted_score = %f\n", adjusted_score);
+        }
 
         // backprop
         Player apply_player = mcts->nodes->e[node_i].player;
@@ -409,6 +418,8 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
     uint32_t best_child_i = 0;
     for (uint32_t child_i = mcts->nodes->e[mcts->root].first_child_i;
          child_i < mcts->nodes->e[mcts->root].first_child_i + mcts->nodes->e[mcts->root].num_children; child_i++) {
+        printf("child_i = %d\n", child_i);
+        printf("visits = %d\n", mcts->nodes->e[child_i].visits);
         if (mcts->nodes->e[child_i].visits >= most_visits) {
             most_visits = mcts->nodes->e[child_i].visits;
             best_child_i = child_i;
@@ -416,10 +427,6 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
     }
     return mcts->nodes_info->e[best_child_i].command;
 }
-
-// ok, big changes to make next.
-// model volleys with chance nodes so it can explore what happens in both options.
-// To do that I need to add in an a way to explicitly say if a volley hits or not when applying a command.
 
 
 int ai_test(void) {
