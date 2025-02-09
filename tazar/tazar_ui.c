@@ -219,10 +219,10 @@ int ui_main(void) {
             } else {
                 switch (current_difficulty) {
                     case DIFFICULTY_EASY:
-                        chosen_ai_command = ai_select_command_random(&game, commands);
+                        chosen_ai_command = ai_select_command_heuristic(&game, commands);
                         break;
                     case DIFFICULTY_MEDIUM:
-                        chosen_ai_command = ai_select_command_random_rollouts(&game, commands);
+                        chosen_ai_command = ai_select_command_uniform_rollouts(&game, commands);
                         break;
                     case DIFFICULTY_HARD:
                         chosen_ai_command = ai_select_command_mcts(ai_arena, &ai_state, &game, commands);

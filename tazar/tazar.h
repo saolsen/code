@@ -56,6 +56,8 @@ typedef struct {
     int id;
 } Piece;
 
+int piece_gold(PieceKind kind);
+
 typedef enum {
     ORDER_NONE = 0,
     ORDER_MOVE,
@@ -131,12 +133,14 @@ typedef enum {
 
 void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result);
 
-Command ai_select_command_random(Game *game, CommandSlice commands);
+Command ai_select_command_heuristic(Game *game, CommandSlice commands);
 
-Command ai_select_command_random_rollouts(Game *game, CommandSlice commands);
+Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands);
 
 Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands);
 
-int ui_main();
+int ai_test(void);
+
+int ui_main(void);
 
 #endif // TAZAR_H

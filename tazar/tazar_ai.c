@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 typedef Array(Game) GameArray;
+typedef Slice(double) DoubleSlice;
 typedef Array(double) DoubleArray;
 
 int rand_in_range(int min, int max) {
@@ -13,59 +14,121 @@ int rand_in_range(int min, int max) {
     return min + rand() / (RAND_MAX / (max - min + 1) + 1);
 }
 
-Command ai_select_command_random(Game *game, CommandSlice commands) {
-    int selected = rand_in_range(0, (int) (commands.len - 1));
-    return commands.e[selected];
+// Heuristic versions of a policy and value which guide the non RL versions of the AI.
+// Returns a value in range of -46 to 46.
+double heuristic_value(Game *game, Player player) {
+    Player opponent = (player == PLAYER_RED ? PLAYER_BLUE : PLAYER_RED);
+    int player_gold = game->gold[player];
+    int player_value = 0;
+    int opponent_gold = game->gold[opponent];
+    int opponent_value = 0;
+
+    int max_gold = 1 * 6 + 5 * 1 + 2 * 3 + 3 * 2;
+
+    // Iterate over all positions on the board.
+    for (int r = -4; r <= 4; r++) {
+        for (int q = -4; q <= 4; q++) {
+            CPos cpos = {q, r, -q - r};
+            Piece *p = board_at((Game *) game, cpos);
+            if (p->kind == PIECE_NONE) { continue; }
+            if (p->player == player) {
+                player_value += piece_gold(p->kind);
+            } else if (p->player == opponent) {
+                opponent_value += piece_gold(p->kind);
+            }
+        }
+    }
+
+    // Full value for winning dispite number of pieces left.
+    if (game->status == STATUS_OVER) {
+        if (game->winner == player) {
+            player_gold = max_gold;
+            opponent_value = 0;
+        } else {
+            opponent_gold = max_gold;
+            opponent_value = 0;
+        }
+    }
+
+    double eval = (player_gold + player_value) - (opponent_gold + opponent_value);
+    return eval;
 }
 
+// probability distribution over commands that could be chosen.
+DoubleSlice heuristic_policy(Arena *arena, Game *game, CommandSlice commands) {
+    double temperature = 2;
+    double current_value = heuristic_value(game, game->turn.player);
+
+    double total_weight = 0.0;
+    DoubleArray *weights = NULL;
+
+
+    for (uint64_t i = 0; i < commands.len; i++) {
+        Game new_game = *game;
+        game_apply_command(&new_game, new_game.turn.player, commands.e[i], VOLLEY_HIT);
+        double new_value = heuristic_value(&new_game, game->turn.player);
+        double delta = new_value - current_value;
+        double weight = exp(delta / temperature);
+        arr_push(arena, weights, weight);
+        total_weight += weight;
+    }
+    if (weights != NULL) {
+        for (uint64_t i = 0; i < weights->len; i++) {
+            weights->e[i] /= total_weight;
+        }
+        return (DoubleSlice) arr_slice(weights);
+    } else {
+        return (DoubleSlice) {0, 0};
+    }
+}
+
+Command ai_select_command_heuristic(Game *game, CommandSlice commands) {
+    Arena *scratch = scratch_acquire();
+    DoubleSlice policy = heuristic_policy(scratch, game, commands);
+
+    double r = ((double) rand() / RAND_MAX);
+    Command picked_command = commands.e[commands.len - 1];
+    for (uint64_t i = 0; i < commands.len; i++) {
+        r -= policy.e[i];
+        if (r <= 0) {
+            picked_command = commands.e[i];
+            break;
+        }
+    }
+    return picked_command;
+}
 
 double ai_rollout(Game game, Command command, int depth) {
     Arena *scratch = scratch_acquire();
 
     Player scoring_player = game.turn.player;
-    Player scoring_opponent = scoring_player == PLAYER_RED ? PLAYER_BLUE : PLAYER_RED;
-    int scoring_player_gold = game.gold[scoring_player];
-    int scoring_opponent_gold = game.gold[scoring_opponent];
-
     game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
 
     while (game.status == STATUS_IN_PROGRESS && depth > 0) {
         CommandSlice commands = game_valid_commands(scratch, &game);
-        Command picked_command = ai_select_command_random(&game, commands);
-        game_apply_command(&game, game.turn.player, picked_command, VOLLEY_ROLL);
+        Command next_command = ai_select_command_heuristic(&game, commands);
+        game_apply_command(&game, game.turn.player, next_command, VOLLEY_ROLL);
         depth--;
     }
 
-    // Gold you would have if you killed every piece.
-    int max_gold = 1 * 6 + 4 * 1 + 2 * 3 + 3 * 2;
-
-    double score = 0.5;
-    int gold_gained = game.gold[scoring_player] - scoring_player_gold;
-    int opponent_gold_gained = game.gold[scoring_opponent] - scoring_opponent_gold;
-    int gold_diff = gold_gained - opponent_gold_gained + max_gold;
-    score = (double) gold_diff / (2 * max_gold);
-
-    if (game.status == STATUS_OVER) {
-        if (game.winner == scoring_player) {
-            score = 1;
-        } else {
-            score = 0;
-        }
-    }
+    double score = heuristic_value(&game, scoring_player);
+//    if (score == 1) {
+//        printf("what?\n");
+//        score = heuristic_value(&game, scoring_player);
+//    }
 
     scratch_release();
     return score;
 }
 
-Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
+Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands) {
     Arena *scratch = scratch_acquire();
 
     DoubleArray *scores = NULL;
     arr_setlen(scratch, scores, commands.len);
-    Player scoring_player = game->turn.player;
 
     for (uint64_t i = 0; i < commands.len; i++) {
-        double total_score = 0.5;
+        double total_score = 0;
         for (int rollout = 0; rollout < 100; rollout++) {
             Game rollout_game = *game;
             double score = ai_rollout(rollout_game, commands.e[i], 300);
@@ -76,7 +139,15 @@ Command ai_select_command_random_rollouts(Game *game, CommandSlice commands) {
         scores->e[i] = avg_score;
     }
 
-    double max_score = 0;
+    printf("scores\n");
+    for (int i = 0; i < commands.len; i++) {
+        if (commands.e[i].kind == COMMAND_VOLLEY) {
+            printf("volley\n");
+        }
+        printf("scores[%d] = %f\n", i, scores->e[i]);
+    }
+
+    double max_score = -INFINITY;
     uint64_t max_score_i = 0;
     for (uint64_t i = 0; i < commands.len; i++) {
         double s = scores->e[i];
@@ -351,7 +422,32 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
 // To do that I need to add in an a way to explicitly say if a volley hits or not when applying a command.
 
 
+int ai_test(void) {
+    Arena *a = arena_new();
 
+    Game game = {0};
+    game_init_attrition_hex_field_small(&game);
+
+    printf("red value %f\n", heuristic_value(&game, PLAYER_RED));
+    printf("blue value %f\n", heuristic_value(&game, PLAYER_BLUE));
+
+    CommandSlice commands = game_valid_commands(a, &game);
+    DoubleSlice policy = heuristic_policy(a, &game, commands);
+    for (int i = 0; i < commands.len; i++) {
+        Command command = commands.e[i];
+        printf("command: %s %d (%d,%d,%d)\n",
+               command.kind == COMMAND_END_TURN ? "END_TURN" : command.kind == COMMAND_MOVE ? "MOVE" : "VOLLEY",
+               command.piece_id, command.target.q, command.target.r,
+               command.target.s);
+        printf("policy[%d] = %f\n", i, policy.e[i]);
+    }
+
+
+    Command command = ai_select_command_heuristic(&game, commands);
+
+
+    return 0;
+}
 
 
 
