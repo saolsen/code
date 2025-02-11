@@ -91,8 +91,8 @@ Command ai_select_command_heuristic(Game *game, CommandSlice commands) {
     DoubleSlice policy = heuristic_policy(scratch, game, commands);
 
     double r = ((double) rand() / RAND_MAX);
-    Command picked_command = commands.e[commands.len - 1];
-    for (uint64_t i = 0; i < commands.len; i++) {
+    Command picked_command = commands.e[0];
+    for (uint64_t i = 1; i < commands.len; i++) {
         r -= policy.e[i];
         if (r <= 0) {
             picked_command = commands.e[i];
@@ -103,20 +103,20 @@ Command ai_select_command_heuristic(Game *game, CommandSlice commands) {
     return picked_command;
 }
 
-double ai_rollout(Game game, Command command, int depth) {
+double ai_rollout(Game *game, Command command, int depth) {
     Arena *scratch = scratch_acquire();
 
-    Player scoring_player = game.turn.player;
-    game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
+    Player scoring_player = game->turn.player;
+    game_apply_command(game, game->turn.player, command, VOLLEY_ROLL);
 
-    while (game.status == STATUS_IN_PROGRESS && depth > 0) {
-        CommandSlice commands = game_valid_commands(scratch, &game);
-        Command next_command = ai_select_command_heuristic(&game, commands);
-        game_apply_command(&game, game.turn.player, next_command, VOLLEY_ROLL);
+    while (game->status == STATUS_IN_PROGRESS && depth > 0) {
+        CommandSlice commands = game_valid_commands(scratch, game);
+        Command next_command = ai_select_command_heuristic(game, commands);
+        game_apply_command(game, game->turn.player, next_command, VOLLEY_ROLL);
         depth--;
     }
 
-    double score = heuristic_value(&game, scoring_player);
+    double score = heuristic_value(game, scoring_player);
     scratch_release();
     return score;
 }
@@ -132,7 +132,7 @@ Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands) {
         int passes = 100;
         for (int rollout = 0; rollout < passes; rollout++) {
             Game rollout_game = *game;
-            double score = ai_rollout(rollout_game, commands.e[i], 299);
+            double score = ai_rollout(&rollout_game, commands.e[i], 299);
             double adjusted_score = (score + 46) / (46 * 2);
 
             total_score += adjusted_score;
@@ -157,38 +157,12 @@ Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands) {
     return result;
 }
 
-typedef enum {
-    NODE_NONE,
-    NODE_DECISION,
-    NODE_CHANCE,
-    NODE_OVER,
-} NodeKind;
-
 typedef struct {
     Game game;
     Command command;
 } NodeInfo;
 
-typedef struct {
-    NodeKind kind;
-    Game game;
-    Command command;
-    uint32_t parent_i;
-    uint32_t first_child_i;
-    uint32_t num_children;
-    uint32_t num_children_to_expand;
-    uint32_t visits;
-    double total_reward;
-    double probability;
-} Node;
-
 typedef Array(Node) NodeArray;
-
-typedef struct {
-    uint32_t root;
-    Node *root_node;
-    NodeArray *nodes;
-} MCTSState;
 
 Node zero_node = (Node) {
         .kind = NODE_NONE,
@@ -231,12 +205,8 @@ void push_command(Command **buf, uintptr_t *len, uintptr_t *cap, Command command
     *len += 1;
 }
 
-Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
+Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice commands) {
     Arena *scratch = scratch_acquire();
-
-    if (*ai_state == NULL) {
-        *ai_state = arena_alloc(arena, MCTSState);
-    }
 
     Node *nodes = NULL;
     uintptr_t nodes_len = 0;
@@ -438,7 +408,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
             double score;
             if (nodes[sim_i].kind != NODE_OVER) {
                 Game sim_game = nodes[sim_i].game;
-                ai_rollout(sim_game, (Command) {0}, 300);
+                ai_rollout(&sim_game, (Command) {0}, 300);
                 score = heuristic_value(&sim_game, scored_player);
             } else {
                 score = heuristic_value(&nodes[sim_i].game, scored_player);
@@ -485,7 +455,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
 int ai_test(void) {
     for (int g = 0; g < 10; g++) {
         printf("game %d\n", g);
-        void *ai_state = NULL;
+        MCTSState ai_state = {0};
 
         Game game = {0};
         game_init_attrition_hex_field_small(&game);
@@ -501,7 +471,7 @@ int ai_test(void) {
                 command = ai_select_command_uniform_rollouts(&game, commands);
             } else {
                 //command = ai_select_command_uniform_rollouts(&game, commands);
-                command = ai_select_command_mcts(scratch, &ai_state, &game, commands);
+                command = ai_select_command_mcts(&ai_state, &game, commands);
             }
             game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
             scratch_release();

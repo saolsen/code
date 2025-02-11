@@ -139,7 +139,34 @@ Command ai_select_command_heuristic(Game *game, CommandSlice commands);
 
 Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands);
 
-Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands);
+typedef enum {
+    NODE_NONE,
+    NODE_DECISION,
+    NODE_CHANCE,
+    NODE_OVER,
+} NodeKind;
+
+typedef struct {
+    NodeKind kind;
+    Game game;
+    Command command;
+    uint32_t parent_i;
+    uint32_t first_child_i;
+    uint32_t num_children;
+    uint32_t num_children_to_expand;
+    uint32_t visits;
+    double total_reward;
+    double probability;
+} Node;
+
+typedef struct {
+    uint32_t root;
+    Node *nodes;
+    uintptr_t nodes_len;
+    uintptr_t nodes_cap;
+} MCTSState;
+
+Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice commands);
 
 int ai_test(void);
 

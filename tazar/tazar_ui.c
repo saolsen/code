@@ -60,9 +60,8 @@ int ui_main(void) {
     Command chosen_ai_command = {0};
 
     Difficulty current_difficulty = DIFFICULTY_HARD;
-
-    Arena *ai_arena = arena_new();
-    void *ai_state = NULL;
+    
+    MCTSState ai_state = {0};
 
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
@@ -225,7 +224,7 @@ int ui_main(void) {
                         chosen_ai_command = ai_select_command_uniform_rollouts(&game, commands);
                         break;
                     case DIFFICULTY_HARD:
-                        chosen_ai_command = ai_select_command_mcts(ai_arena, &ai_state, &game, commands);
+                        chosen_ai_command = ai_select_command_mcts(&ai_state, &game, commands);
                         break;
                 }
                 selected_piece_id = chosen_ai_command.piece_id;
