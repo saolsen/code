@@ -5,6 +5,6 @@
 
 int main(void) {
     sranddev();
-    //return ui_main();
-    return ai_test();
+    return ui_main();
+    //return ai_test();
 }

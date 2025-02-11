@@ -178,44 +178,207 @@ typedef struct {
 
 typedef struct {
     NodeKind kind;
-    Player player;
+    Game game;
+    Command command;
     uint32_t parent_i;
+    uint32_t num_unexpanded_children;
     uint32_t first_child_i;
-    uint32_t num_children;
+    uint32_t next_child_i;
     uint32_t visits;
     double total_reward;
     double probability;
 } Node;
 
-typedef Array(NodeInfo) NodeInfoArray;
 typedef Array(Node) NodeArray;
 
 typedef struct {
+    Arena *arena;
     uint32_t root;
     NodeArray *nodes;
-    NodeInfoArray *nodes_info;
 } MCTSState;
 
 Node zero_node = (Node) {
         .kind = NODE_NONE,
-        .player = PLAYER_NONE,
+        .game = (Game) {0},
+        .command = (Command) {0},
         .parent_i = 0,
+        .num_unexpanded_children = 0,
         .first_child_i = 0,
-        .num_children = 0,
+        .next_child_i = 0,
         .visits = 0,
         .total_reward = 0,
         .probability = 0,
 };
-NodeInfo zero_node_info = (NodeInfo) {
-        .game = (Game) {0},
-        .command = (Command) {0},
-};
+//NodeInfo zero_node_info = (NodeInfo) {
+//
+//        .command = (Command) {0},
+//};
 
+// This version is simpler than the old one, but much less cache friendly because children nodes are scattered
+// and nodes are much bigger.
+
+Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
+    Arena *scratch = scratch_acquire();
+
+    // Initialize
+    MCTSState *mcts;
+    arena_reset(arena);
+    mcts = arena_alloc(arena, MCTSState);
+    arr_push(arena, mcts->nodes, zero_node);
+    arr_push(arena, mcts->nodes, ((Node) {
+            .kind = NODE_DECISION,
+            .game = *game,
+            .command = (Command) {0},
+            .parent_i = 0,
+            .num_unexpanded_children = (uint32_t) commands.len,
+            .first_child_i = 0,
+            .next_child_i = 0,
+            .visits = 0,
+            .total_reward = 0,
+    }));
+    mcts->root = 1;
+
+    CommandArray *child_commands = NULL;
+    arr_push(scratch, child_commands, (Command) {0});
+    CommandArray *unexpanded_commands = NULL;
+    arr_push(scratch, unexpanded_commands, (Command) {0});
+
+    double c = sqrt(2);
+    //uint32_t passes = 100 * (uint32_t) commands.len + 1;
+    uint32_t passes = 500;
+    for (uint32_t pass = 0; pass < passes; pass++) {
+        if (pass == 9) {
+            printf("break;");
+        }
+        // Selection
+        uint32_t node_i = mcts->root;
+        while (mcts->nodes->e[node_i].kind != NODE_OVER && mcts->nodes->e[node_i].num_unexpanded_children == 0) {
+            // select node from children
+            double highest_uct = -INFINITY;
+            uint32_t highest_uct_i = 0;
+            uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
+            while (child_i != 0) {
+                double child_uct = (mcts->nodes->e[child_i].total_reward / mcts->nodes->e[child_i].visits) +
+                                   c * sqrt(log(mcts->nodes->e[node_i].visits) / mcts->nodes->e[child_i].visits);
+                if (child_uct > highest_uct) {
+                    highest_uct = child_uct;
+                    highest_uct_i = child_i;
+                }
+                child_i = mcts->nodes->e[child_i].next_child_i;
+            }
+            node_i = highest_uct_i;
+        }
+
+        // Expansion
+        if (mcts->nodes->e[node_i].kind != NODE_OVER) {
+            assert(mcts->nodes->e[node_i].num_unexpanded_children > 0);
+
+            child_commands->len = 0;
+            uint32_t last_child_i = 0;
+            uint32_t child_i = mcts->nodes->e[node_i].first_child_i;
+            while (child_i != 0) {
+                arr_push(scratch, child_commands, mcts->nodes->e[child_i].command);
+                last_child_i = child_i;
+                child_i = mcts->nodes->e[child_i].next_child_i;
+            }
+
+            unexpanded_commands->len = 0;
+            CommandSlice node_commands = game_valid_commands(scratch, &mcts->nodes->e[node_i].game);
+            for (uint64_t i = 0; i < node_commands.len; i++) {
+                bool found = false;
+                for (uint64_t j = 0; j < child_commands->len; j++) {
+                    if (command_eq(node_commands.e[i], child_commands->e[j])) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    arr_push(scratch, unexpanded_commands, node_commands.e[i]);
+                }
+            }
+            assert(unexpanded_commands->len > 0);
+            Command child_command = ai_select_command_heuristic(&mcts->nodes->e[node_i].game,
+                                                                (CommandSlice) arr_slice(unexpanded_commands));
+
+            // todo handle volleys with chance nodes.
+
+            Game child_game = mcts->nodes->e[node_i].game;
+            game_apply_command(&child_game, child_game.turn.player, child_command, VOLLEY_ROLL);
+            CommandSlice next_commands = game_valid_commands(scratch, &child_game);
+
+            uint32_t new_child_i = (uint32_t) mcts->nodes->len;
+            arr_push(arena, (mcts->nodes), ((Node) {
+                    .kind = child_game.status == STATUS_OVER ? NODE_OVER : NODE_DECISION,
+                    .game = child_game,
+                    .command = child_command,
+                    .parent_i = node_i,
+                    .num_unexpanded_children = (uint32_t) next_commands.len,
+                    .first_child_i = 0,
+                    .next_child_i = 0,
+                    .visits = 0,
+                    .total_reward = 0,
+                    .probability = 1.0,
+            }));
+            if (last_child_i == 0) {
+                mcts->nodes->e[node_i].first_child_i = new_child_i;
+            } else {
+                mcts->nodes->e[last_child_i].next_child_i = new_child_i;
+            }
+            mcts->nodes->e[node_i].num_unexpanded_children--;
+            node_i = new_child_i;
+        }
+
+        Player scored_player = mcts->nodes->e[mcts->root].game.turn.player;
+        if (mcts->nodes->e[node_i].parent_i != 0) {
+            scored_player = mcts->nodes->e[mcts->nodes->e[node_i].parent_i].game.turn.player;
+        }
+
+        // Simulation
+        double score;
+        if (mcts->nodes->e[node_i].kind != NODE_OVER) {
+            Game sim_game = mcts->nodes->e[node_i].game;
+            ai_rollout(sim_game, (Command) {0}, 300);
+            score = heuristic_value(&sim_game, scored_player);
+        } else {
+            score = heuristic_value(&mcts->nodes->e[node_i].game, scored_player);
+        }
+
+        // Backpropagation
+        while (node_i != 0) {
+            if ((node_i == 1 && scored_player == game->turn.player) ||
+                (mcts->nodes->e[mcts->nodes->e[node_i].parent_i].game.turn.player == scored_player)) {
+                mcts->nodes->e[node_i].total_reward += score;
+            } else {
+                mcts->nodes->e[node_i].total_reward -= score;
+            }
+            mcts->nodes->e[node_i].visits++;
+            node_i = mcts->nodes->e[node_i].parent_i;
+        }
+    }
+
+    // Select command.
+
+    uint32_t most_visits = 0;
+    uint32_t best_child_i = 0;
+    uint32_t child_i = mcts->nodes->e[mcts->root].first_child_i;
+    while (child_i != 0) {
+        if (mcts->nodes->e[child_i].visits >= most_visits) {
+            most_visits = mcts->nodes->e[child_i].visits;
+            best_child_i = child_i;
+        }
+        child_i = mcts->nodes->e[child_i].next_child_i;
+    }
+
+    scratch_release();
+    return mcts->nodes->e[best_child_i].command;
+}
+
+#if 0
 // lots of problems with this still
 // should use a pool of nodes probably instead so I can drop the ones that are not needed.
 // makes this less cache friendly though, since children won't necessarily be packed together.
 
-Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
+Command ai_select_command_mcts_old(Arena *arena, void **ai_state, Game *game, CommandSlice commands) {
     Arena *scratch = scratch_acquire();
 
     MCTSState *mcts;
@@ -229,6 +392,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
                 //new_root = i;
                 break;
             }
+
         }
     }
     if (new_root == 0) {
@@ -446,7 +610,7 @@ Command ai_select_command_mcts(Arena *arena, void **ai_state, Game *game, Comman
     scratch_release();
     return mcts->nodes_info->e[best_child_i].command;
 }
-
+#endif
 
 int ai_test(void) {
 

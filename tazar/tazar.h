@@ -120,6 +120,8 @@ typedef struct {
     CPos target;
 } Command;
 
+bool command_eq(Command a, Command b);
+
 typedef Slice(Command) CommandSlice;
 typedef Array(Command) CommandArray;
 

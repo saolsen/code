@@ -277,6 +277,10 @@ int piece_gold(PieceKind kind) {
     }
 }
 
+bool command_eq(Command a, Command b) {
+    return a.kind == b.kind && a.piece_id == b.piece_id && cpos_eq(a.target, b.target);
+}
+
 CPosSlice volley_targets(Arena *a, Game *game, CPos from) {
     Piece *piece = board_at(game, from);
 
