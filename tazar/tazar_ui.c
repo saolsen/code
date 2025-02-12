@@ -52,7 +52,7 @@ int ui_main(void) {
 
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
     int selected_piece_id = 0;
-
+    
     int num_ai_turn_lag_frames = 45;
     int ai_turn_lag_frames_left = 0;
     int num_ai_thinking_frames = 60 * 5;
@@ -63,7 +63,7 @@ int ui_main(void) {
     MCState mc_state = {0};
     MCTSState mcts_state = {0};
 
-    Difficulty current_difficulty = DIFFICULTY_HARD;
+    Difficulty current_difficulty = DIFFICULTY_EASY;
 
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
@@ -269,6 +269,21 @@ int ui_main(void) {
 
         // Actions List (todo)
         DrawRectangleLines(20, 58, 240, screen_height - 78, GRAY);
+
+        // AI Progress Bar
+        if (ui_state == UI_STATE_AI_TURN && num_ai_thinking_frames > 0) {
+            float progress = 1.0f - ((float) num_ai_thinking_frames_left / (float) num_ai_thinking_frames);
+            Rectangle progress_bar_bg = {24, 100, 232, 20};
+            Rectangle progress_bar = {24, 100, 232 * progress, 20};
+
+            DrawRectangleRec(progress_bar_bg, LIGHTGRAY);
+            DrawRectangleRec(progress_bar, BLUE);
+            DrawRectangleLines(progress_bar_bg.x, progress_bar_bg.y, progress_bar_bg.width, progress_bar_bg.height,
+                               GRAY);
+            DrawText("AI THINKING...", 24, 125, 19, GRAY);
+        }
+
+
         //DrawText("ACTIONS", 24, 30, 19, GRAY);
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
             DrawText("SELECT COMMAND", 24, 70, 19, GRAY);
