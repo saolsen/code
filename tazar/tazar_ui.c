@@ -52,7 +52,7 @@ int ui_main(void) {
 
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
     int selected_piece_id = 0;
-    
+
     int num_ai_turn_lag_frames = 45;
     int ai_turn_lag_frames_left = 0;
     int num_ai_thinking_frames = 60 * 5;
@@ -336,7 +336,7 @@ int ui_main(void) {
         DrawRectangleRec(diff_medium_button, medium_color);
         DrawRectangleRec(diff_hard_button, hard_color);
 
-        DrawText("Very Easy", diff_easy_button.x + 10, diff_easy_button.y + 5, 19, RAYWHITE);
+        DrawText("Easy", diff_easy_button.x + 10, diff_easy_button.y + 5, 19, RAYWHITE);
         DrawText("Medium", diff_medium_button.x + 10, diff_medium_button.y + 5, 19, RAYWHITE);
         DrawText("Hard", diff_hard_button.x + 10, diff_hard_button.y + 5, 19, RAYWHITE);
 

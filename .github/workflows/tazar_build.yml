@@ -1,0 +1,60 @@
+name: tazar build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (ninja)
+        run: choco install ninja
+
+      - name: Deps (gcc)
+        shell: powershell
+        run: choco install mingw --version=8.1.0 -y
+
+      - name: Configure CMake
+        working-directory: cmake
+        run: |
+          cmake -S . -G Ninja -B cmake-windows-gcc-17 -DCMAKE_C_COMPILER=gcc -DCMAKE_C_STANDARD=17
+
+      - name: Release with CMake
+        working-directory: cmake
+        run: cmake --build cmake-windows-gcc-17 --config Release --target tazar
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: tazar.exe
+          path: cmake-windows-gcc-17/tazar.exe
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang, gcc-14]
+        c_standard: [11, 17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Configure CMake
+        working-directory: cmake
+        run: |
+          cmake -S . -B cmake-macos-clang-17 -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=17
+
+      - name: Release with CMake
+        working-directory: cmake
+        run: cmake --build cmake-macos-clang-17 --config Release --target tazar
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: tazar
+          path: cmake-macos-clang-17/tazar
