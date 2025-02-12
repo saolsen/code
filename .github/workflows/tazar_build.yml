@@ -28,7 +28,7 @@ jobs:
         run: cmake --build cmake-windows-gcc-17 --config Release --target tazar
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tazar.exe
           path: cmake-windows-gcc-17/tazar.exe
@@ -54,7 +54,7 @@ jobs:
         run: cmake --build cmake-macos-clang-17 --config Release --target tazar
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tazar
           path: cmake-macos-clang-17/tazar
