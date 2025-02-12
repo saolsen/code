@@ -212,7 +212,6 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
     uintptr_t nodes_len = 0;
     uintptr_t nodes_cap = 0;
 
-    // Initialize
     push_node(&nodes, &nodes_len, &nodes_cap, zero_node);
     push_node(&nodes, &nodes_len, &nodes_cap, (Node) {
             .kind = NODE_DECISION,
@@ -227,6 +226,7 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
             .probability = 1.0,
     });
     assert(nodes_len == 2);
+
     uint32_t root_i = 1;
 
     Command *unexpanded_commands = NULL;
@@ -416,7 +416,7 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
 
             // Backpropagation
             while (sim_i != 0) {
-                if ((sim_i == 1 && scored_player == game->turn.player) ||
+                if ((sim_i == root_i && scored_player == game->turn.player) ||
                     (nodes[nodes[sim_i].parent_i].game.turn.player == scored_player)) {
                     nodes[sim_i].total_reward += score;
                 } else {
@@ -444,6 +444,11 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
     }
 
     Command result = nodes[best_child_i].command;
+
+//    ai_state->root = root_i;
+//    ai_state->nodes = nodes;
+//    ai_state->nodes_len = nodes_len;
+//    ai_state->nodes_cap = nodes_cap;
 
     free(nodes);
     free(unexpanded_commands);
