@@ -14,24 +14,24 @@ jobs:
       - name: Deps (ninja)
         run: choco install ninja
 
-      - name: Deps (gcc)
+      - name: Deps (clang)
         shell: powershell
-        run: choco install mingw --version=8.1.0 -y
+        run: choco install llvm -y
 
       - name: Configure CMake
         working-directory: cmake
         run: |
-          cmake -S . -G Ninja -B cmake-windows-gcc-17 -DCMAKE_C_COMPILER=gcc -DCMAKE_C_STANDARD=17 -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -G Ninja -B cmake-windows-clang-17 -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=17 -DCMAKE_BUILD_TYPE=Release
 
       - name: Release with CMake
         working-directory: cmake
-        run: cmake --build cmake-windows-gcc-17 --target tazar
+        run: cmake --build cmake-windows-clang-17 --target tazar
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: tazar.exe
-          path: cmake/cmake-windows-gcc-17/tazar.exe
+          path: cmake/cmake-windows-clang-17/tazar.exe
 
   macos:
     runs-on: macos-latest
