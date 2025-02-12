@@ -234,28 +234,20 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
     uintptr_t unexpanded_commands_cap = 0;
 
     double c = sqrt(2);
+    double dpw_k = 1.0; // @note: tuneable
+    double dpw_alpha = 0.5;
+
     uint32_t passes = 100 * (uint32_t) commands.len + 1;
     for (uint32_t pass = 0; pass < passes; pass++) {
         // Selection
         uint32_t node_i = root_i;
-        while (nodes[node_i].kind != NODE_OVER && nodes[node_i].num_children_to_expand == 0) {
-            // select node from children
-            assert(nodes[node_i].num_children > 0);
+        //while (nodes[node_i].kind != NODE_OVER && nodes[node_i].num_children_to_expand == 0) {
+        while (true) {
+            if (nodes[node_i].kind == NODE_OVER) {
+                break;
+            }
 
-            if (nodes[node_i].kind == NODE_DECISION) {
-                double highest_uct = -INFINITY;
-                uint32_t highest_uct_i = 0;
-                for (uint32_t i = 0; i < nodes[node_i].num_children; i++) {
-                    uint32_t child_i = nodes[node_i].first_child_i + i;
-                    double child_uct = (nodes[child_i].total_reward / nodes[child_i].visits) +
-                                       c * sqrt(log(nodes[node_i].visits) / nodes[child_i].visits);
-                    if (child_uct > highest_uct) {
-                        highest_uct = child_uct;
-                        highest_uct_i = child_i;
-                    }
-                }
-                node_i = highest_uct_i;
-            } else if (nodes[node_i].kind == NODE_CHANCE) {
+            if (nodes[node_i].kind == NODE_CHANCE) {
                 double r = (double) rand() / RAND_MAX;  // random value in [0,1)
                 double cumulative = 0.0;
                 uint32_t child_i = 0;
@@ -271,9 +263,31 @@ Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice com
                 }
                 assert(found);
                 node_i = child_i;
-            } else {
-                assert(false);
+                continue;
             }
+
+            assert(nodes[node_i].kind == NODE_DECISION);
+            double allowed_children = dpw_k * pow((double) nodes[node_i].visits, dpw_alpha) + 1;
+            if (nodes[node_i].num_children_to_expand > 0 &&
+                nodes[node_i].num_children < allowed_children) {
+                // Expand a new child.
+                break;
+            }
+
+            // Pick child with highest UCT.
+            assert(nodes[node_i].num_children > 0);
+            double highest_uct = -INFINITY;
+            uint32_t highest_uct_i = 0;
+            for (uint32_t i = 0; i < nodes[node_i].num_children; i++) {
+                uint32_t child_i = nodes[node_i].first_child_i + i;
+                double child_uct = (nodes[child_i].total_reward / nodes[child_i].visits) +
+                                   c * sqrt(log(nodes[node_i].visits) / nodes[child_i].visits);
+                if (child_uct > highest_uct) {
+                    highest_uct = child_uct;
+                    highest_uct_i = child_i;
+                }
+            }
+            node_i = highest_uct_i;
         }
 
         uint32_t nodes_to_simulate[2] = {node_i, 0};
