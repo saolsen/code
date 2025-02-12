@@ -151,8 +151,6 @@ void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iteratio
 
 Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands);
 
-Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands);
-
 typedef enum {
     NODE_NONE,
     NODE_DECISION,
@@ -179,8 +177,6 @@ typedef struct {
     uintptr_t nodes_len;
     uintptr_t nodes_cap;
 } MCTSState;
-
-Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice commands);
 
 MCTSState ai_mcts_state_init(Game *game, CommandSlice commands);
 
