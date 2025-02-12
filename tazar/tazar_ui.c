@@ -1,7 +1,5 @@
 // A really basic implementation of Tazar and an AI player, so I have someone to play with.
 // https://kelleherbros.itch.io/tazar
-// Been running this alongside and inputting all the moves into the real game, that's why it
-// asks for the results of Volley rolls. Not really meant to be "played" standalone.
 #include "tazar.h"
 
 #include "raylib.h"
@@ -57,11 +55,15 @@ int ui_main(void) {
 
     int num_ai_turn_lag_frames = 45;
     int ai_turn_lag_frames_left = 0;
+    int num_ai_thinking_frames = 60 * 5;
+    int num_ai_thinking_frames_left = 0;
+    bool ai_thinking = false;
     Command chosen_ai_command = {0};
 
+    MCState mc_state = {0};
+    MCTSState mcts_state = {0};
+
     Difficulty current_difficulty = DIFFICULTY_HARD;
-    
-    MCTSState ai_state = {0};
 
     while (!WindowShouldClose()) {
         arena_reset(frame_arena);
@@ -108,7 +110,7 @@ int ui_main(void) {
             }
         }
 
-        if (mouse_clicked) {
+        if (mouse_clicked && ui_state != UI_STATE_AI_TURN) {
             if (mouse_in_easy)
                 current_difficulty = DIFFICULTY_EASY;
             if (mouse_in_medium)
@@ -191,45 +193,74 @@ int ui_main(void) {
         }
 
         // AI Turn
-        if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER &&
-            game.turn.player == PLAYER_BLUE) {
-            ui_state = UI_STATE_AI_TURN;
-            ai_turn_lag_frames_left = 1;
-            chosen_ai_command = (Command) {0};
-        }
+        if (ui_state == UI_STATE_AI_TURN) {
+            if (ai_thinking && num_ai_thinking_frames_left-- > 0) {
+                switch (current_difficulty) {
+                    case DIFFICULTY_MEDIUM:
+                        ai_mc_think(&mc_state, &game, commands, 10);
+                        break;
+                    case DIFFICULTY_HARD:
+                        ai_mcts_think(&mcts_state, &game, commands, 10);
+                        break;
+                    default:
+                        break;
+                }
+            }
 
-        if (ui_state == UI_STATE_AI_TURN && ai_turn_lag_frames_left-- <= 0) {
-            if (chosen_ai_command.kind != COMMAND_NONE) {
+            if (ai_thinking && num_ai_thinking_frames_left <= 0) {
+                switch (current_difficulty) {
+                    case DIFFICULTY_EASY:
+                        chosen_ai_command = ai_select_command_heuristic(&game, commands);
+                        break;
+                    case DIFFICULTY_MEDIUM:
+                        chosen_ai_command = ai_mc_select_command(&mc_state, &game, commands);
+                        ai_mc_state_cleanup(&mc_state);
+                        break;
+                    case DIFFICULTY_HARD:
+                        chosen_ai_command = ai_mcts_select_command(&mcts_state, &game, commands);
+                        ai_mcts_state_cleanup(&mcts_state);
+                        break;
+                }
+                ai_thinking = false;
+                selected_piece_id = chosen_ai_command.piece_id;
+                ai_turn_lag_frames_left = num_ai_turn_lag_frames;
+            }
+
+            if (!ai_thinking && ai_turn_lag_frames_left-- <= 0) {
                 // Apply the command.
                 game_apply_command(&game, game.turn.player, chosen_ai_command, VOLLEY_ROLL);
                 commands = game_valid_commands(frame_arena, &game);
 
                 if (game.status == STATUS_OVER) {
                     ui_state = UI_STATE_GAME_OVER;
-                } else if (game.turn.player == PLAYER_BLUE) {
-                    chosen_ai_command = (Command) {0};
-                    selected_piece_id = 0;
-                    ai_turn_lag_frames_left = num_ai_turn_lag_frames;
                 } else {
                     selected_piece_id = 0;
-                    mouse_in_board = false; // hack because AI blocks and mouse could have moved.
                     ui_state = UI_STATE_WAITING_FOR_SELECTION;
                 }
-            } else {
-                switch (current_difficulty) {
-                    case DIFFICULTY_EASY:
-                        chosen_ai_command = ai_select_command_heuristic(&game, commands);
-                        break;
-                    case DIFFICULTY_MEDIUM:
-                        chosen_ai_command = ai_select_command_uniform_rollouts(&game, commands);
-                        break;
-                    case DIFFICULTY_HARD:
-                        chosen_ai_command = ai_select_command_mcts(&ai_state, &game, commands);
-                        break;
-                }
-                selected_piece_id = chosen_ai_command.piece_id;
-                ai_turn_lag_frames_left = num_ai_turn_lag_frames;
             }
+        }
+
+        if (ui_state != UI_STATE_AI_TURN && game.status != STATUS_OVER &&
+            game.turn.player == PLAYER_BLUE) {
+            chosen_ai_command = (Command) {0};
+
+            // Initialize the AI state and start thinking.
+            switch (current_difficulty) {
+                case DIFFICULTY_EASY:
+                    // Easy doesn't need any time to think.
+                    num_ai_thinking_frames_left = 0;
+                    break;
+                case DIFFICULTY_MEDIUM:
+                    mc_state = ai_mc_state_init(&game, commands);
+                    num_ai_thinking_frames_left = num_ai_thinking_frames;
+                    break;
+                case DIFFICULTY_HARD:
+                    mcts_state = ai_mcts_state_init(&game, commands);
+                    num_ai_thinking_frames_left = num_ai_thinking_frames;
+                    break;
+            }
+            ui_state = UI_STATE_AI_TURN;
+            ai_thinking = true;
         }
 
         // Draw
@@ -238,7 +269,7 @@ int ui_main(void) {
 
         // Actions List (todo)
         DrawRectangleLines(20, 58, 240, screen_height - 78, GRAY);
-        DrawText("ACTIONS", 24, 30, 19, GRAY);
+        //DrawText("ACTIONS", 24, 30, 19, GRAY);
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
             DrawText("SELECT COMMAND", 24, 70, 19, GRAY);
         } else if (ui_state == UI_STATE_WAITING_FOR_SELECTION) {

@@ -113,7 +113,7 @@ typedef enum {
 } CommandKind;
 
 // note: Probably want to specify the piece by CPos so that all possible commands
-// can be packed into a single array. Will need that for RL.
+// can be packed into a single array. Will probably need that for RL.
 typedef struct {
     CommandKind kind;
     int piece_id;
@@ -136,6 +136,23 @@ typedef enum {
 void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result);
 
 Command ai_select_command_heuristic(Game *game, CommandSlice commands);
+
+typedef struct {
+    Game game;
+    CommandSlice commands;
+    double *scores;
+    uintptr_t scores_len;
+    uintptr_t scores_cap;
+    int passes;
+} MCState;
+
+MCState ai_mc_state_init(Game *game, CommandSlice commands);
+
+void ai_mc_state_cleanup(MCState *state);
+
+void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iterations);
+
+Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands);
 
 Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands);
 
@@ -167,6 +184,14 @@ typedef struct {
 } MCTSState;
 
 Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice commands);
+
+MCTSState ai_mcts_state_init(Game *game, CommandSlice commands);
+
+void ai_mcts_state_cleanup(MCTSState *state);
+
+void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iterations);
+
+Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice commands);
 
 int ai_test(void);
 

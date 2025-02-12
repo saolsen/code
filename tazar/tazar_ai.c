@@ -121,6 +121,83 @@ double ai_rollout(Game *game, Command command, int depth) {
     return score;
 }
 
+void push_num(double **buf, uintptr_t *len, uintptr_t *cap, double n) {
+    // allocate more free space if needed
+    if (*len >= *cap) {
+        if (*cap == 0) {
+            *cap = 1024;
+        } else {
+            *cap *= 2;
+        }
+        *buf = realloc(*buf, *cap * sizeof(**buf));
+    }
+    (*buf)[*len] = n;
+    *len += 1;
+}
+
+MCState ai_mc_state_init(Game *game, CommandSlice commands) {
+    double *scores = NULL;
+    uintptr_t scores_len = 0;
+    uintptr_t scores_cap = 0;
+
+    for (uint64_t i = 0; i < commands.len; i++) {
+        push_num(&scores, &scores_len, &scores_cap, 0);
+    }
+
+    MCState state = {
+            .scores = scores,
+            .scores_len = scores_len,
+            .scores_cap = scores_cap,
+            .passes = 0,
+    };
+    return state;
+}
+
+void ai_mc_state_cleanup(MCState *state) {
+    if (state->scores != NULL) {
+        free(state->scores);
+    }
+}
+
+
+// @todo: need to do smaller steps because a rollout for each command takes way longer than the frame budget.
+void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iterations) {
+    double *scores = state->scores;
+    uintptr_t scores_len = state->scores_len;
+
+    assert(scores_len == commands.len);
+
+    // Do a single rollout for each command.
+    for (uint64_t i = 0; i < commands.len; i++) {
+        Game rollout_game = *game;
+        double score = ai_rollout(&rollout_game, commands.e[i], 299);
+        double adjusted_score = (score + 46) / (46 * 2);
+        scores[i] += adjusted_score;
+    }
+
+    state->passes += 1;
+}
+
+Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands) {
+    double *scores = state->scores;
+    uintptr_t scores_len = state->scores_len;
+
+    assert(scores_len == commands.len);
+
+    double max_score = -INFINITY;
+    uint64_t max_score_i = 0;
+    for (uint64_t i = 0; i < commands.len; i++) {
+        double s = scores[i] / state->passes;
+        if (s > max_score) {
+            max_score = s;
+            max_score_i = i;
+        }
+    }
+
+    Command result = commands.e[max_score_i];
+    return result;
+}
+
 Command ai_select_command_uniform_rollouts(Game *game, CommandSlice commands) {
     Arena *scratch = scratch_acquire();
 
@@ -203,6 +280,301 @@ void push_command(Command **buf, uintptr_t *len, uintptr_t *cap, Command command
     }
     (*buf)[*len] = command;
     *len += 1;
+}
+
+MCTSState ai_mcts_state_init(Game *game, CommandSlice commands) {
+    Node *nodes = NULL;
+    uintptr_t nodes_len = 0;
+    uintptr_t nodes_cap = 0;
+
+    push_node(&nodes, &nodes_len, &nodes_cap, zero_node);
+    push_node(&nodes, &nodes_len, &nodes_cap, (Node) {
+            .kind = NODE_DECISION,
+            .game = *game,
+            .command = (Command) {0},
+            .parent_i = 0,
+            .first_child_i = 0,
+            .num_children = 0,
+            .num_children_to_expand = (uint32_t) commands.len,
+            .visits = 0,
+            .total_reward = 0,
+            .probability = 1.0,
+    });
+    assert(nodes_len == 2);
+
+    uint32_t root_i = 1;
+
+    return (MCTSState) {
+            .root = root_i,
+            .nodes = nodes,
+            .nodes_len = nodes_len,
+            .nodes_cap = nodes_cap,
+    };
+}
+
+void ai_mcts_state_cleanup(MCTSState *state) {
+    if (state->nodes != NULL) {
+        free(state->nodes);
+    }
+}
+
+void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iterations) {
+    Arena *scratch = scratch_acquire();
+
+    Node *nodes = state->nodes;
+    uintptr_t nodes_len = state->nodes_len;
+    uintptr_t nodes_cap = state->nodes_cap;
+
+    uint32_t root_i = state->root;
+
+    Command *unexpanded_commands = NULL;
+    uintptr_t unexpanded_commands_len = 0;
+    uintptr_t unexpanded_commands_cap = 0;
+
+    double c = sqrt(2);
+    double dpw_k = 1.0; // @note: tuneable
+    double dpw_alpha = 0.5;
+
+    //uint32_t passes = 100 * (uint32_t) commands.len + 1;
+    for (uint32_t pass = 0; pass < iterations; pass++) {
+        // Selection
+        uint32_t node_i = root_i;
+        //while (nodes[node_i].kind != NODE_OVER && nodes[node_i].num_children_to_expand == 0) {
+        while (true) {
+            if (nodes[node_i].kind == NODE_OVER) {
+                break;
+            }
+
+            if (nodes[node_i].kind == NODE_CHANCE) {
+                double r = (double) rand() / RAND_MAX;  // random value in [0,1)
+                double cumulative = 0.0;
+                uint32_t child_i = 0;
+                bool found = false;
+                assert(nodes[node_i].num_children == 2);
+                for (uint32_t i = 0; i < nodes[node_i].num_children; i++) {
+                    child_i = nodes[node_i].first_child_i + i;
+                    cumulative += nodes[child_i].probability;
+                    if (r <= cumulative) {
+                        found = true;
+                        break;
+                    }
+                }
+                assert(found);
+                node_i = child_i;
+                continue;
+            }
+
+            assert(nodes[node_i].kind == NODE_DECISION);
+            double allowed_children = dpw_k * pow((double) nodes[node_i].visits, dpw_alpha) + 1;
+            if (nodes[node_i].num_children_to_expand > 0 &&
+                nodes[node_i].num_children < allowed_children) {
+                // Expand a new child.
+                break;
+            }
+
+            // Pick child with highest UCT.
+            assert(nodes[node_i].num_children > 0);
+            double highest_uct = -INFINITY;
+            uint32_t highest_uct_i = 0;
+            for (uint32_t i = 0; i < nodes[node_i].num_children; i++) {
+                uint32_t child_i = nodes[node_i].first_child_i + i;
+                double child_uct = (nodes[child_i].total_reward / nodes[child_i].visits) +
+                                   c * sqrt(log(nodes[node_i].visits) / nodes[child_i].visits);
+                if (child_uct > highest_uct) {
+                    highest_uct = child_uct;
+                    highest_uct_i = child_i;
+                }
+            }
+            node_i = highest_uct_i;
+        }
+
+        uint32_t nodes_to_simulate[2] = {node_i, 0};
+
+        // Expansion
+        if (nodes[node_i].kind != NODE_OVER) {
+            assert(nodes[node_i].num_children_to_expand > 0);
+
+            // If this is the first child, allocate the buffer.
+            if (nodes[node_i].num_children == 0) {
+                assert(nodes[node_i].first_child_i == 0);
+                nodes[node_i].first_child_i = (uint32_t) nodes_len;
+                for (uint32_t i = 0; i < nodes[node_i].num_children_to_expand; i++) {
+                    push_node(&nodes, &nodes_len, &nodes_cap, zero_node);
+                }
+                assert(nodes_len == nodes[node_i].first_child_i + nodes[node_i].num_children_to_expand);
+            }
+
+            CommandSlice node_commands = game_valid_commands(scratch, &nodes[node_i].game);
+            assert(node_commands.len == nodes[node_i].num_children_to_expand + nodes[node_i].num_children);
+            unexpanded_commands_len = 0;
+            for (uint64_t i = 0; i < node_commands.len; i++) {
+                bool found = false;
+                for (uint32_t j = 0; j < nodes[node_i].num_children; j++) {
+                    uint32_t child_i = nodes[node_i].first_child_i + j;
+                    if (command_eq(node_commands.e[i], nodes[child_i].command)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    push_command(&unexpanded_commands, &unexpanded_commands_len, &unexpanded_commands_cap,
+                                 node_commands.e[i]);
+                }
+            }
+            assert(unexpanded_commands_len > 0);
+            Command child_command = ai_select_command_heuristic(&nodes[node_i].game,
+                                                                (CommandSlice) {.len = unexpanded_commands_len,
+                                                                        .e = unexpanded_commands});
+
+            uint32_t next_child_i = nodes[node_i].first_child_i + nodes[node_i].num_children;
+            Game child_game = nodes[node_i].game;
+
+            if (child_command.kind == COMMAND_VOLLEY) {
+                Game hit_game = child_game;
+                Game miss_game = child_game;
+                game_apply_command(&hit_game, hit_game.turn.player, child_command, VOLLEY_HIT);
+                game_apply_command(&miss_game, miss_game.turn.player, child_command, VOLLEY_MISS);
+                CommandSlice hit_next_commands = game_valid_commands(scratch, &hit_game);
+                CommandSlice miss_next_commands = game_valid_commands(scratch, &miss_game);
+
+                uint32_t hit_child_i = (uint32_t) nodes_len;
+                uint32_t miss_child_i = hit_child_i + 1;
+
+                nodes[next_child_i] = (Node) {
+                        .kind = NODE_CHANCE,
+                        .game = child_game,
+                        .command = child_command,
+                        .parent_i = node_i,
+                        .first_child_i = hit_child_i,
+                        .num_children = 2,
+                        .num_children_to_expand = 0,
+                        .visits = 0,
+                        .total_reward = 0,
+                        .probability = 1.0,
+                };
+                nodes[node_i].num_children++;
+                nodes[node_i].num_children_to_expand--;
+
+                push_node(&nodes, &nodes_len, &nodes_cap, (Node) {
+                        .kind = NODE_DECISION,
+                        .game = hit_game,
+                        .command = child_command,
+                        .parent_i = next_child_i,
+                        .first_child_i = 0,
+                        .num_children = 0,
+                        .num_children_to_expand = (uint32_t) hit_next_commands.len,
+                        .visits = 0,
+                        .total_reward = 0,
+                        .probability = 0.4167,
+                });
+                push_node(&nodes, &nodes_len, &nodes_cap, (Node) {
+                        .kind = NODE_DECISION,
+                        .game = miss_game,
+                        .command = child_command,
+                        .parent_i = next_child_i,
+                        .first_child_i = 0,
+                        .num_children = 0,
+                        .num_children_to_expand = (uint32_t) miss_next_commands.len,
+                        .visits = 0,
+                        .total_reward = 0,
+                        .probability = 1 - 0.4167,
+                });
+                nodes_to_simulate[0] = hit_child_i;
+                nodes_to_simulate[1] = miss_child_i;
+            } else {
+                game_apply_command(&child_game, child_game.turn.player, child_command, VOLLEY_ROLL);
+                CommandSlice next_commands = game_valid_commands(scratch, &child_game);
+
+                nodes[next_child_i] = (Node) {
+                        .kind = child_game.status == STATUS_OVER ? NODE_OVER : NODE_DECISION,
+                        .game = child_game,
+                        .command = child_command,
+                        .parent_i = node_i,
+                        .first_child_i = 0,
+                        .num_children = 0,
+                        .num_children_to_expand = (uint32_t) next_commands.len,
+                        .visits = 0,
+                        .total_reward = 0,
+                        .probability = 1.0,
+                };
+                nodes[node_i].num_children++;
+                nodes[node_i].num_children_to_expand--;
+                nodes_to_simulate[0] = next_child_i;
+                nodes_to_simulate[1] = 0;
+            }
+        }
+
+        for (uint32_t i = 0; i < 2; i++) {
+            uint32_t sim_i = nodes_to_simulate[i];
+            if (sim_i == 0) {
+                continue;
+            }
+
+            // Scored player is the player that will be scored at the end of the simulation.
+            Player scored_player = nodes[root_i].game.turn.player;
+            if (nodes[sim_i].parent_i != 0) {
+                scored_player = nodes[nodes[sim_i].parent_i].game.turn.player;
+            }
+
+            // Simulation
+            double score;
+            if (nodes[sim_i].kind != NODE_OVER) {
+                Game sim_game = nodes[sim_i].game;
+                ai_rollout(&sim_game, (Command) {0}, 300);
+                score = heuristic_value(&sim_game, scored_player);
+            } else {
+                score = heuristic_value(&nodes[sim_i].game, scored_player);
+            }
+
+            // Backpropagation
+            while (sim_i != 0) {
+                if ((sim_i == root_i && scored_player == game->turn.player) ||
+                    (nodes[nodes[sim_i].parent_i].game.turn.player == scored_player)) {
+                    nodes[sim_i].total_reward += score;
+                } else {
+                    nodes[sim_i].total_reward -= score;
+                }
+                nodes[sim_i].visits++;
+                sim_i = nodes[sim_i].parent_i;
+            }
+        }
+    }
+
+    state->nodes = nodes;
+    state->nodes_len = nodes_len;
+    state->nodes_cap = nodes_cap;
+
+    state->root = root_i;
+
+    if (unexpanded_commands != NULL) {
+        free(unexpanded_commands);
+    }
+
+    scratch_release();
+}
+
+Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice commands) {
+    Node *nodes = state->nodes;
+    uintptr_t nodes_len = state->nodes_len;
+    uint32_t root_i = state->root;
+
+    // Select best command.
+    uint32_t most_visits = 0;
+    uint32_t best_child_i = 0;
+
+    assert(nodes[root_i].num_children > 0);
+    assert(nodes[root_i].num_children == commands.len);
+    assert(nodes[root_i].num_children_to_expand == 0);
+    for (uint32_t i = 0; i < nodes[root_i].num_children; i++) {
+        uint32_t child_i = nodes[root_i].first_child_i + i;
+        if (nodes[child_i].visits >= most_visits) {
+            most_visits = nodes[child_i].visits;
+            best_child_i = child_i;
+        }
+    }
+
+    Command result = nodes[best_child_i].command;
+    return result;
 }
 
 Command ai_select_command_mcts(MCTSState *ai_state, Game *game, CommandSlice commands) {
@@ -501,3 +873,6 @@ int ai_test(void) {
 
     return 0;
 }
+
+// rollouts take way too long. Is it better to do more iterations and shorter rollouts for MCTS? Prolly, but I need
+// a better eval function for that I think.
