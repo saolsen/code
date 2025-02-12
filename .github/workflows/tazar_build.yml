@@ -21,25 +21,20 @@ jobs:
       - name: Configure CMake
         working-directory: cmake
         run: |
-          cmake -S . -G Ninja -B cmake-windows-gcc-17 -DCMAKE_C_COMPILER=gcc -DCMAKE_C_STANDARD=17
+          cmake -S . -G Ninja -B cmake-windows-gcc-17 -DCMAKE_C_COMPILER=gcc -DCMAKE_C_STANDARD=17 -DCMAKE_BUILD_TYPE=Release
 
       - name: Release with CMake
         working-directory: cmake
-        run: cmake --build cmake-windows-gcc-17 --config Release --target tazar
+        run: cmake --build cmake-windows-gcc-17 --target tazar
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: tazar.exe
-          path: cmake-windows-gcc-17/tazar.exe
+          path: cmake/cmake-windows-gcc-17/tazar.exe
 
   macos:
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [clang, gcc-14]
-        c_standard: [11, 17]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -47,14 +42,14 @@ jobs:
       - name: Configure CMake
         working-directory: cmake
         run: |
-          cmake -S . -B cmake-macos-clang-17 -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=17
+          cmake -S . -B cmake-macos-clang-17 -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=17 -DCMAKE_BUILD_TYPE=Release
 
       - name: Release with CMake
         working-directory: cmake
-        run: cmake --build cmake-macos-clang-17 --config Release --target tazar
+        run: cmake --build cmake-macos-clang-17 --target tazar
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: tazar
-          path: cmake-macos-clang-17/tazar
+          path: cmake/cmake-macos-clang-17/tazar
