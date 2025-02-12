@@ -136,58 +136,52 @@ void push_num(double **buf, uintptr_t *len, uintptr_t *cap, double n) {
 }
 
 MCState ai_mc_state_init(Game *game, CommandSlice commands) {
-    double *scores = NULL;
-    uintptr_t scores_len = 0;
-    uintptr_t scores_cap = 0;
+    double *scores = malloc(commands.len * sizeof(*scores));
+    int *passes = malloc(commands.len * sizeof(*passes));
 
     for (uint64_t i = 0; i < commands.len; i++) {
-        push_num(&scores, &scores_len, &scores_cap, 0);
+        scores[i] = 0;
+        passes[i] = 0;
     }
 
     MCState state = {
             .scores = scores,
-            .scores_len = scores_len,
-            .scores_cap = scores_cap,
-            .passes = 0,
+            .passes = passes,
+            .i = 0,
     };
     return state;
 }
 
 void ai_mc_state_cleanup(MCState *state) {
-    if (state->scores != NULL) {
-        free(state->scores);
-    }
+    free(state->scores);
+    free(state->passes);
 }
 
 
 // @todo: need to do smaller steps because a rollout for each command takes way longer than the frame budget.
 void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iterations) {
     double *scores = state->scores;
-    uintptr_t scores_len = state->scores_len;
-
-    assert(scores_len == commands.len);
+    int *passes = state->passes;
 
     // Do a single rollout for each command.
-    for (uint64_t i = 0; i < commands.len; i++) {
+    for (int iteration = 0; iteration < iterations; iteration++) {
         Game rollout_game = *game;
-        double score = ai_rollout(&rollout_game, commands.e[i], 299);
+        double score = ai_rollout(&rollout_game, commands.e[state->i], 299);
         double adjusted_score = (score + 46) / (46 * 2);
-        scores[i] += adjusted_score;
+        scores[state->i] += adjusted_score;
+        passes[state->i] += 1;
+        state->i = (state->i + 1) % (int) commands.len;
     }
-
-    state->passes += 1;
 }
 
 Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands) {
     double *scores = state->scores;
-    uintptr_t scores_len = state->scores_len;
-
-    assert(scores_len == commands.len);
+    int *passes = state->passes;
 
     double max_score = -INFINITY;
     uint64_t max_score_i = 0;
     for (uint64_t i = 0; i < commands.len; i++) {
-        double s = scores[i] / state->passes;
+        double s = scores[i] / passes[i];
         if (s > max_score) {
             max_score = s;
             max_score_i = i;

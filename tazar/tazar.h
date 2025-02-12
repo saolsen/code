@@ -138,12 +138,9 @@ void game_apply_command(Game *game, Player player, Command command, VolleyResult
 Command ai_select_command_heuristic(Game *game, CommandSlice commands);
 
 typedef struct {
-    Game game;
-    CommandSlice commands;
     double *scores;
-    uintptr_t scores_len;
-    uintptr_t scores_cap;
-    int passes;
+    int *passes;
+    int i;
 } MCState;
 
 MCState ai_mc_state_init(Game *game, CommandSlice commands);
