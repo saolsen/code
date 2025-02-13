@@ -138,6 +138,7 @@ _Static_assert(sizeof(char) == 1, "char must be 8 bits");
 #define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
 #define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 
 uint64_t pow2_next(uint64_t i);
 
@@ -166,7 +167,9 @@ struct Arena {
 _Static_assert(sizeof(Arena) % 16 == 0, "Arena size must be a multiple of 16 bytes");
 
 Arena *arena_new(void);
+
 void arena_reset(Arena *arena);
+
 void arena_free(Arena *arena);
 
 _Thread_local static Arena *scratch__arena = NULL;
@@ -179,13 +182,16 @@ _Thread_local static Arena *scratch__arena = NULL;
 // Depending on the program, this can be bad if you are using it in a long-lived context for a lot
 // of temp memory. Consider manually creating and freeing an arena in that case.
 Arena *scratch_acquire(void);
+
 // Release reference to the scratch arena. Will be reset if there are no other references.
 void scratch_release(void);
+
 // Manually free all scratch memory.
 // Useful if you know the allocation is big and nobody has a reference.
 void scratch_free(void);
 
 #define arena_alloc(arena, type) (type *)arena_alloc_size(arena, sizeof(type), _Alignof(type))
+
 uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align);
 
 // Get the size of the arena (not including the arena struct itself).
@@ -197,7 +203,9 @@ size_t arena_size(Arena *arena);
 // can dedicate an arena to it and use arena_serialize and arena_deserialize to clone it.
 // Buf must have space for arena_size(arena) bytes.
 void arena_serialize(void *buf, Arena *arena);
+
 void arena_deserialize(Arena *arena, void *buf, size_t size);
+
 // Note that dest comes first which matches the order arena_serialize and memcpy use.
 void arena_clone(Arena *dest, Arena *src);
 
@@ -243,6 +251,7 @@ typedef struct {
     {.len = (slice).len,                                                                           \
      .e = (__typeof__((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice),                    \
                                                     sizeof(*((slice).e)))}
+
 uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size);
 
 // Array
@@ -269,7 +278,9 @@ typedef Array(uint8_t) U8Array;
 
 #define arena_alloc_array(arena, type, item_type, cap)                                             \
     (type *)arena__alloc_array(arena, sizeof(item_type), cap)
+
 U8Array *arena__alloc_array(Arena *arena, size_t item_size, uint64_t cap);
+
 U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint64_t amount);
 
 #define arr_push(arena, array, val)                                                                \
@@ -312,6 +323,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint6
 
 #define arena_clone_arr(arena, array)                                                              \
     (__typeof__(array))arena__clone_arr(arena, (U8Array *)(array), sizeof((array)->e[0]))
+
 U8Array *arena__clone_arr(Arena *arena, U8Array *array, size_t item_size);
 
 // Notes on Array vs Slice
@@ -350,6 +362,8 @@ typedef Slice(uint8_t) String;
 typedef Array(String) StringArray;
 typedef Slice(String) StringSlice;
 
+String str_format(Arena *a, const char *fmt, ...);
+
 StringSlice str_split(Arena *a, String s, char sep);
 
 // @todo(steve): hashmaps.
@@ -370,12 +384,10 @@ StringSlice str_split(Arena *a, String s, char sep);
 
 #if defined(_WIN64)
 // Windows
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 // @note(steve): Must include Windows.h first.
 #include <Memoryapi.h>
-
-// todo(steve): For future msvc, can I set a pragma or whatever to link kernal32.lib?
-// #pragma comment(lib, "kernel32.lib")
 
 static size_t memory__page_size(void) {
     SYSTEM_INFO sys_info;
@@ -693,7 +705,7 @@ char *arena__alloc_cstring(Arena *a, String *s) {
     return c;
 }
 
-String format(Arena *a, const char *fmt, ...) {
+String str_format(Arena *a, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     va_list args_copy;
@@ -735,16 +747,27 @@ StringSlice str_split(Arena *a, String s, char sep) {
 #ifdef STEVE_TEST
 
 static void test_helpers(void);
+
 static void test_arena_acquire_release(void);
+
 static void test_arena_reset(void);
+
 static void test_arena_free(void);
+
 static void test_arena_alloc_alignment(void);
+
 static void test_arena_large_alloc(void);
+
 static void test_rel_ptr(void);
+
 static void test_slices(void);
+
 static void test_rel_slices(void);
+
 static void test_dynamic_arrays(void);
+
 static void test_arena_serialize(void);
+
 static void test_strings(void);
 
 int main(void) {
@@ -1098,7 +1121,7 @@ static void test_strings(void) {
     Arena *a = arena_new();
 
     // format
-    String s1 = format(a, "Hello %d %s", 42, "World");
+    String s1 = str_format(a, "Hello %d %s", 42, "World");
     assert(s1.len == 14);
     assert(strncmp((const char *)s1.e, "Hello 42 World", s1.len) == 0);
 
