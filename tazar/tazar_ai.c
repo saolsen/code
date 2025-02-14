@@ -62,6 +62,7 @@ void heuristic_policy(double *weights, Game *game, Command *commands, int num_co
 
     double total_weight = 0.0;
 
+
     for (int i = 0; i < num_commands; i++) {
         Game new_game = *game;
         game_apply_command(&new_game, new_game.turn.player, commands[i], VOLLEY_HIT);
@@ -107,6 +108,7 @@ double ai_rollout(Game *game, Command command, int depth) {
     while (game->status == STATUS_IN_PROGRESS && depth > 0) {
         int num_commands = game_valid_commands(&(commands[0]), 1024, game);
         Command next_command = ai_select_command_heuristic(game, commands, num_commands);
+
         game_apply_command(game, game->turn.player, next_command, VOLLEY_ROLL);
         depth--;
     }
@@ -136,6 +138,7 @@ MCState ai_mc_state_init(Game *game, Command *commands, int num_commands) {
     int *passes = malloc((size_t) num_commands * sizeof(*passes));
 
     for (int i = 0; i < num_commands; i++) {
+
         scores[i] = 0;
         passes[i] = 0;
     }
