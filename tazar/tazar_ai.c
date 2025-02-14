@@ -187,7 +187,7 @@ Command ai_mc_select_command(MCState *state, Game *game, Command *commands, int 
 }
 
 
-Node zero_node = (Node) {
+const Node zero_node = (Node) {
         .kind = NODE_NONE,
         .game = (Game) {0},
         .command = (Command) {0},
