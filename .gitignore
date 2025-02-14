@@ -1,3 +1,6 @@
+.cache
 .idea
+.vscode
+build
 cmake/cmake-*
 cmake/Testing
