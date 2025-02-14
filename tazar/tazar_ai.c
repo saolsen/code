@@ -187,16 +187,7 @@ Command ai_mc_select_command(MCState *state, Game *game, Command *commands, int 
 }
 
 
-const Node zero_node = (Node) {
-        .kind = NODE_NONE,
-        .parent_i = 0,
-        .first_child_i = 0,
-        .num_children = 0,
-        .num_children_to_expand = 0,
-        .visits = 0,
-        .total_reward = 0,
-        .probability = 0,
-};
+const Node zero_node;
 
 void push_node(Node **buf, uintptr_t *len, uintptr_t *cap, Node n) {
     if (*len >= *cap) {
