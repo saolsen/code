@@ -1,7 +1,8 @@
 #ifndef TAZAR_H
 #define TAZAR_H
 
-#include "steve.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 // Hex position in double coordinates.
 // * Useful coordinates for game logic.
@@ -122,10 +123,8 @@ typedef struct {
 
 bool command_eq(Command a, Command b);
 
-typedef Slice(Command) CommandSlice;
-typedef Array(Command) CommandArray;
+int game_valid_commands(Command *buf, int max_commands, Game *game);
 
-CommandSlice game_valid_commands(Arena *a, Game *game);
 
 typedef enum {
     VOLLEY_ROLL,
@@ -135,7 +134,9 @@ typedef enum {
 
 void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result);
 
-Command ai_select_command_heuristic(Game *game, CommandSlice commands);
+
+Command ai_select_command_heuristic(Game *game, Command *commands, int num_commands);
+
 
 typedef struct {
     double *scores;
@@ -143,13 +144,15 @@ typedef struct {
     int i;
 } MCState;
 
-MCState ai_mc_state_init(Game *game, CommandSlice commands);
+
+MCState ai_mc_state_init(Game *game, Command *commands, int num_commands);
 
 void ai_mc_state_cleanup(MCState *state);
 
-void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iterations);
+void ai_mc_think(MCState *state, Game *game, Command *commands, int num_commands, int iterations);
 
-Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands);
+Command ai_mc_select_command(MCState *state, Game *game, Command *commands, int num_commands);
+
 
 typedef enum {
     NODE_NONE,
@@ -178,13 +181,14 @@ typedef struct {
     uintptr_t nodes_cap;
 } MCTSState;
 
-MCTSState ai_mcts_state_init(Game *game, CommandSlice commands);
+MCTSState ai_mcts_state_init(Game *game, Command *commands, int num_commands);
 
 void ai_mcts_state_cleanup(MCTSState *state);
 
-void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iterations);
+void ai_mcts_think(MCTSState *state, Game *game, Command *commands, int num_commands, int iterations);
 
-Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice commands);
+Command ai_mcts_select_command(MCTSState *state, Game *game, Command *commands, int num_commands);
+
 
 int ai_test(void);
 

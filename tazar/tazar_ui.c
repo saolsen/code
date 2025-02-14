@@ -4,9 +4,9 @@
 
 #include "raylib.h"
 #include <math.h>
+#include <assert.h>
 
 typedef enum {
-    UI_STATE_NONE,
     UI_STATE_WAITING_FOR_SELECTION,
     UI_STATE_WAITING_FOR_COMMAND,
     UI_STATE_AI_TURN,
@@ -48,8 +48,6 @@ int ui_main(void) {
     SetTargetFPS(60);
     SetExitKey(0);
 
-    Arena *frame_arena = arena_new();
-
     UIState ui_state = UI_STATE_WAITING_FOR_SELECTION;
     int selected_piece_id = 0;
 
@@ -65,10 +63,13 @@ int ui_main(void) {
 
     Difficulty current_difficulty = DIFFICULTY_EASY;
 
-    while (!WindowShouldClose()) {
-        arena_reset(frame_arena);
+    Command commands[1024];
+    int num_commands = 0;
 
-        CommandSlice commands = game_valid_commands(frame_arena, &game);
+    while (!WindowShouldClose()) {
+
+        num_commands = game_valid_commands(&commands[0], 1024, &game);
+        assert(num_commands <= 1024);
 
         bool mouse_in_game_area = CheckCollisionPointRec(GetMousePosition(), game_area) &&
                                   !(CheckCollisionPointRec(GetMousePosition(), left_panel) ||
@@ -127,7 +128,8 @@ int ui_main(void) {
                                        .piece_id = 0,
                                        .target = (CPos) {0, 0, 0},
                                }), VOLLEY_ROLL);
-            commands = game_valid_commands(frame_arena, &game);
+            num_commands = game_valid_commands(&commands[0], 1024, &game);
+            assert(num_commands <= 1024);
             ui_state = UI_STATE_WAITING_FOR_SELECTION;
         }
         if (ui_state == UI_STATE_WAITING_FOR_COMMAND) {
@@ -136,20 +138,21 @@ int ui_main(void) {
                 ui_state = UI_STATE_WAITING_FOR_SELECTION;
             } else if (mouse_clicked && mouse_in_board) {
                 bool matched_command = false;
-                for (uint64_t i = 0; i < commands.len; i++) {
-                    Command command = commands.e[i];
+                for (int i = 0; i < num_commands; i++) {
+                    Command command = commands[i];
                     if (command.piece_id == selected_piece_id &&
                         cpos_eq(command.target, mouse_cpos)) {
                         matched_command = true;
                         game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
-                        commands = game_valid_commands(frame_arena, &game);
+                        num_commands = game_valid_commands(&commands[0], 1024, &game);
+                        assert(num_commands <= 1024);
                         break;
                     }
                 }
                 if (matched_command) {
                     bool has_another_command = false;
-                    for (uint64_t i = 0; i < commands.len; i++) {
-                        Command command = commands.e[i];
+                    for (int i = 0; i < num_commands; i++) {
+                        Command command = commands[i];
                         if (command.piece_id == selected_piece_id) {
                             has_another_command = true;
                             break;
@@ -160,15 +163,16 @@ int ui_main(void) {
                         ui_state = UI_STATE_WAITING_FOR_SELECTION;
                     }
                     // If there are no more commands for this player, end the turn.
-                    if (commands.len == 1) {
-                        assert(commands.e[0].kind == COMMAND_END_TURN);
+                    if (num_commands == 1) {
+                        assert(commands[0].kind == COMMAND_END_TURN);
                         game_apply_command(&game, game.turn.player,
                                            ((Command) {
                                                    .kind = COMMAND_END_TURN,
                                                    .piece_id = 0,
                                                    .target = (CPos) {0, 0, 0},
                                            }), VOLLEY_ROLL);
-                        commands = game_valid_commands(frame_arena, &game);
+                        num_commands = game_valid_commands(&commands[0], 1024, &game);
+                        assert(num_commands <= 1024);
                         ui_state = UI_STATE_WAITING_FOR_SELECTION;
                     }
                 } else {
@@ -180,8 +184,8 @@ int ui_main(void) {
             if (mouse_clicked && mouse_in_board) {
                 Piece selected_piece = *board_at(&game, mouse_cpos);
                 if (selected_piece.player == game.turn.player) {
-                    for (uint64_t i = 0; i < commands.len; i++) {
-                        Command command = commands.e[i];
+                    for (int i = 0; i < num_commands; i++) {
+                        Command command = commands[i];
                         if (command.piece_id == selected_piece.id) {
                             selected_piece_id = selected_piece.id;
                             ui_state = UI_STATE_WAITING_FOR_COMMAND;
@@ -197,10 +201,10 @@ int ui_main(void) {
             if (ai_thinking && num_ai_thinking_frames_left-- > 0) {
                 switch (current_difficulty) {
                     case DIFFICULTY_MEDIUM:
-                        ai_mc_think(&mc_state, &game, commands, 10);
+                        ai_mc_think(&mc_state, &game, commands, num_commands, 10);
                         break;
                     case DIFFICULTY_HARD:
-                        ai_mcts_think(&mcts_state, &game, commands, 25);
+                        ai_mcts_think(&mcts_state, &game, commands, num_commands, 25);
                         break;
                     default:
                         break;
@@ -210,14 +214,14 @@ int ui_main(void) {
             if (ai_thinking && num_ai_thinking_frames_left <= 0) {
                 switch (current_difficulty) {
                     case DIFFICULTY_EASY:
-                        chosen_ai_command = ai_select_command_heuristic(&game, commands);
+                        chosen_ai_command = ai_select_command_heuristic(&game, commands, num_commands);
                         break;
                     case DIFFICULTY_MEDIUM:
-                        chosen_ai_command = ai_mc_select_command(&mc_state, &game, commands);
+                        chosen_ai_command = ai_mc_select_command(&mc_state, &game, commands, num_commands);
                         ai_mc_state_cleanup(&mc_state);
                         break;
                     case DIFFICULTY_HARD:
-                        chosen_ai_command = ai_mcts_select_command(&mcts_state, &game, commands);
+                        chosen_ai_command = ai_mcts_select_command(&mcts_state, &game, commands, num_commands);
                         ai_mcts_state_cleanup(&mcts_state);
                         break;
                 }
@@ -229,7 +233,8 @@ int ui_main(void) {
             if (!ai_thinking && ai_turn_lag_frames_left-- <= 0) {
                 // Apply the command.
                 game_apply_command(&game, game.turn.player, chosen_ai_command, VOLLEY_ROLL);
-                commands = game_valid_commands(frame_arena, &game);
+                num_commands = game_valid_commands(&commands[0], 1024, &game);
+                assert(num_commands <= 1024);
 
                 if (game.status == STATUS_OVER) {
                     ui_state = UI_STATE_GAME_OVER;
@@ -251,11 +256,11 @@ int ui_main(void) {
                     num_ai_thinking_frames_left = 0;
                     break;
                 case DIFFICULTY_MEDIUM:
-                    mc_state = ai_mc_state_init(&game, commands);
+                    mc_state = ai_mc_state_init(&game, commands, num_commands);
                     num_ai_thinking_frames_left = num_ai_thinking_frames;
                     break;
                 case DIFFICULTY_HARD:
-                    mcts_state = ai_mcts_state_init(&game, commands);
+                    mcts_state = ai_mcts_state_init(&game, commands, num_commands);
                     num_ai_thinking_frames_left = num_ai_thinking_frames;
                     break;
             }
@@ -421,8 +426,8 @@ int ui_main(void) {
             }
         }
 
-        for (uint64_t i = 0; i < commands.len; i++) {
-            Command command = commands.e[i];
+        for (int i = 0; i < num_commands; i++) {
+            Command command = commands[i];
             if (command.piece_id == selected_piece_id) {
                 DPos target_dpos = dpos_from_cpos(command.target);
                 Vector2 target_pos = (Vector2) {game_center.x + (horizontal_offset * (float) target_dpos.x),
@@ -443,8 +448,8 @@ int ui_main(void) {
                 hovered_piece.player == game.turn.player) {
                 Color color = hovered_piece.player == PLAYER_RED ? MAROON : DARKBLUE;
 
-                for (uint64_t i = 0; i < commands.len; i++) {
-                    Command command = commands.e[i];
+                for (int i = 0; i < num_commands; i++) {
+                    Command command = commands[i];
                     if (command.piece_id == hovered_piece.id) {
                         DPos target_dpos = dpos_from_cpos(command.target);
                         Vector2 target_pos =

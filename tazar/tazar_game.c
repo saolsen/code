@@ -1,6 +1,7 @@
-#include "steve.h"
 #include "tazar.h"
 
+#include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -229,9 +230,6 @@ void game_init_attrition_hex_field_small(Game *game) {
     game->turn.activation_i = 1; // Special case for attrition.
 }
 
-typedef Slice(CPos) CPosSlice;
-typedef Array(CPos) CPosArray;
-
 int piece_movement(PieceKind kind) {
     switch (kind) {
         case PIECE_CROWN:
@@ -281,10 +279,11 @@ bool command_eq(Command a, Command b) {
     return a.kind == b.kind && a.piece_id == b.piece_id && cpos_eq(a.target, b.target);
 }
 
-CPosSlice volley_targets(Arena *a, Game *game, CPos from) {
-    Piece *piece = board_at(game, from);
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 
-    CPosArray *result = NULL;
+int volley_targets(CPos *targets, int max_targets, Game *game, CPos from) {
+    int num_targets = 0;
+    Piece *piece = board_at(game, from);
 
     // Hardcoded for hex field small.
     for (int r = -4; r <= 4; r++) {
@@ -295,20 +294,20 @@ CPosSlice volley_targets(Arena *a, Game *game, CPos from) {
                 // Check if the target is in range.
                 CPos vec = {cpos.q - from.q, cpos.r - from.r, cpos.s - from.s};
                 if ((ABS(vec.q) + ABS(vec.r) + ABS(vec.s)) / 2 <= 2) {
-                    arr_push(a, result, cpos);
+                    if (num_targets < max_targets) {
+                        targets[num_targets] = cpos;
+                    }
+                    num_targets++;
                 }
             }
         }
     }
 
-    if (result == NULL) {
-        return (CPosSlice) {0, 0};
-    } else {
-        return (CPosSlice) arr_slice(result);
-    }
+    return num_targets;
 }
 
 int move_targets(CPos *targets, int max_targets, Game *game, CPos from) {
+    assert(max_targets >= 64);
     Piece *piece = board_at(game, from);
     int movement = piece_movement(piece->kind);
     int max_strength = piece_strength(piece->kind) - 1;
@@ -378,16 +377,18 @@ int move_targets(CPos *targets, int max_targets, Game *game, CPos from) {
 }
 
 
-CommandSlice game_valid_commands(Arena *a, Game *game) {
-    Arena *scratch = scratch_acquire();
+int game_valid_commands(Command *buf, int max_commands, Game *game) {
+    int num_commands = 0;
 
-    CommandArray *commands = NULL;
     // You can always end your turn.
-    arr_push(a, commands, ((Command) {
-            .kind = COMMAND_END_TURN,
-            .piece_id = 0,
-            .target = (CPos) {0, 0, 0},
-    }));
+    if (num_commands < max_commands) {
+        buf[num_commands] = (Command) {
+                .kind = COMMAND_END_TURN,
+                .piece_id = 0,
+                .target = (CPos) {0, 0, 0},
+        };
+    }
+    num_commands++;
 
     Activation *activation = &(game->turn.activations[game->turn.activation_i]);
 
@@ -443,32 +444,38 @@ CommandSlice game_valid_commands(Arena *a, Game *game) {
                 int targets_len = move_targets(&(targets[0]), 64, game, cpos);
                 for (int i = 0; i < targets_len; i++) {
                     CPos target = targets[i];
-                    arr_push(a, commands, ((Command) {
-                            .kind = COMMAND_MOVE,
-                            .piece_id = piece->id,
-                            .target = target,
-                    }));
+                    if (num_commands < max_commands) {
+                        buf[num_commands] = (Command) {
+                                .kind = COMMAND_MOVE,
+                                .piece_id = piece->id,
+                                .target = target,
+                        };
+                    }
+                    num_commands++;
                 }
             }
 
             if (piece_can_action) {
                 if (piece->kind == PIECE_BOW) {
-                    CPosSlice targets = volley_targets(scratch, game, cpos);
-                    for (uint64_t i = 0; i < targets.len; i++) {
-                        CPos target = targets.e[i];
-                        arr_push(a, commands, ((Command) {
-                                .kind = COMMAND_VOLLEY,
-                                .piece_id = piece->id,
-                                .target = target,
-                        }));
+                    CPos targets[18];
+                    int targets_len = volley_targets(&(targets[0]), 64, game, cpos);
+                    for (int i = 0; i < targets_len; i++) {
+                        CPos target = targets[i];
+                        if (num_commands < max_commands) {
+                            buf[num_commands] = (Command) {
+                                    .kind = COMMAND_VOLLEY,
+                                    .piece_id = piece->id,
+                                    .target = target,
+                            };
+                        }
+                        num_commands++;
                     }
                 }
             }
         }
     }
 
-    scratch_release();
-    return (CommandSlice) arr_slice(commands);
+    return num_commands;
 }
 
 void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result) {

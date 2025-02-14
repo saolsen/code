@@ -1,13 +1,10 @@
-#include "steve.h"
 #include "tazar.h"
 
+#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef Array(Game) GameArray;
-typedef Slice(double) DoubleSlice;
-typedef Array(double) DoubleArray;
 
 int rand_in_range(int min, int max) {
     // todo: better random number generation
@@ -59,65 +56,66 @@ double heuristic_value(Game *game, Player player) {
 }
 
 // probability distribution over commands that could be chosen.
-DoubleSlice heuristic_policy(Arena *arena, Game *game, CommandSlice commands) {
+void heuristic_policy(double *weights, Game *game, Command *commands, int num_commands) {
     double temperature = 2;
     double current_value = heuristic_value(game, game->turn.player);
 
     double total_weight = 0.0;
-    DoubleArray *weights = NULL;
 
 
-    for (uint64_t i = 0; i < commands.len; i++) {
+    for (int i = 0; i < num_commands; i++) {
         Game new_game = *game;
-        game_apply_command(&new_game, new_game.turn.player, commands.e[i], VOLLEY_HIT);
+        game_apply_command(&new_game, new_game.turn.player, commands[i], VOLLEY_HIT);
         double new_value = heuristic_value(&new_game, game->turn.player);
         double delta = new_value - current_value;
         double weight = exp(delta / temperature);
-        arr_push(arena, weights, weight);
+        weights[i] = weight;
         total_weight += weight;
     }
-    if (weights != NULL) {
-        for (uint64_t i = 0; i < weights->len; i++) {
-            weights->e[i] /= total_weight;
-        }
-        return (DoubleSlice) arr_slice(weights);
-    } else {
-        return (DoubleSlice) {0, 0};
+
+    for (int i = 0; i < num_commands; i++) {
+        weights[i] /= total_weight;
     }
 }
 
-Command ai_select_command_heuristic(Game *game, CommandSlice commands) {
-    Arena *scratch = scratch_acquire();
-    DoubleSlice policy = heuristic_policy(scratch, game, commands);
+Command ai_select_command_heuristic(Game *game, Command *commands, int num_commands) {
+    double *weights = malloc((size_t) num_commands * sizeof(*weights));
+
+    heuristic_policy(weights, game, commands, num_commands);
 
     double r = ((double) rand() / RAND_MAX);
-    Command picked_command = commands.e[0];
-    for (uint64_t i = 1; i < commands.len; i++) {
-        r -= policy.e[i];
+    Command picked_command = commands[0];
+    for (int i = 1; i < num_commands; i++) {
+        r -= weights[i];
         if (r <= 0) {
-            picked_command = commands.e[i];
+            picked_command = commands[i];
             break;
         }
     }
-    scratch_release();
+
+    free(weights);
+
     return picked_command;
 }
 
 double ai_rollout(Game *game, Command command, int depth) {
-    Arena *scratch = scratch_acquire();
-
     Player scoring_player = game->turn.player;
     game_apply_command(game, game->turn.player, command, VOLLEY_ROLL);
 
+    // todo: Can I have these big arrays on the stack?
+    Command *commands = malloc(1024 * sizeof(*commands));
+
     while (game->status == STATUS_IN_PROGRESS && depth > 0) {
-        CommandSlice commands = game_valid_commands(scratch, game);
-        Command next_command = ai_select_command_heuristic(game, commands);
+        int num_commands = game_valid_commands(&(commands[0]), 1024, game);
+        Command next_command = ai_select_command_heuristic(game, commands, num_commands);
+
         game_apply_command(game, game->turn.player, next_command, VOLLEY_ROLL);
         depth--;
     }
 
     double score = heuristic_value(game, scoring_player);
-    scratch_release();
+
+    free(commands);
     return score;
 }
 
@@ -135,11 +133,12 @@ void push_num(double **buf, uintptr_t *len, uintptr_t *cap, double n) {
     *len += 1;
 }
 
-MCState ai_mc_state_init(Game *game, CommandSlice commands) {
-    double *scores = malloc(commands.len * sizeof(*scores));
-    int *passes = malloc(commands.len * sizeof(*passes));
+MCState ai_mc_state_init(Game *game, Command *commands, int num_commands) {
+    double *scores = malloc((size_t) num_commands * sizeof(*scores));
+    int *passes = malloc((size_t) num_commands * sizeof(*passes));
 
-    for (uint64_t i = 0; i < commands.len; i++) {
+    for (int i = 0; i < num_commands; i++) {
+
         scores[i] = 0;
         passes[i] = 0;
     }
@@ -158,29 +157,27 @@ void ai_mc_state_cleanup(MCState *state) {
 }
 
 
-// @todo: need to do smaller steps because a rollout for each command takes way longer than the frame budget.
-void ai_mc_think(MCState *state, Game *game, CommandSlice commands, int iterations) {
+void ai_mc_think(MCState *state, Game *game, Command *commands, int num_commands, int iterations) {
     double *scores = state->scores;
     int *passes = state->passes;
 
-    // Do a single rollout for each command.
     for (int iteration = 0; iteration < iterations; iteration++) {
         Game rollout_game = *game;
-        double score = ai_rollout(&rollout_game, commands.e[state->i], 299);
+        double score = ai_rollout(&rollout_game, commands[state->i], 299);
         double adjusted_score = (score + 46) / (46 * 2);
         scores[state->i] += adjusted_score;
         passes[state->i] += 1;
-        state->i = (state->i + 1) % (int) commands.len;
+        state->i = (state->i + 1) % num_commands;
     }
 }
 
-Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands) {
+Command ai_mc_select_command(MCState *state, Game *game, Command *commands, int num_commands) {
     double *scores = state->scores;
     int *passes = state->passes;
 
     double max_score = -INFINITY;
-    uint64_t max_score_i = 0;
-    for (uint64_t i = 0; i < commands.len; i++) {
+    int max_score_i = 0;
+    for (int i = 0; i < num_commands; i++) {
         double s = scores[i] / passes[i];
         if (s > max_score) {
             max_score = s;
@@ -188,26 +185,14 @@ Command ai_mc_select_command(MCState *state, Game *game, CommandSlice commands) 
         }
     }
 
-    Command result = commands.e[max_score_i];
+    Command result = commands[max_score_i];
     return result;
 }
 
 
-Node zero_node = (Node) {
-        .kind = NODE_NONE,
-        .game = (Game) {0},
-        .command = (Command) {0},
-        .parent_i = 0,
-        .first_child_i = 0,
-        .num_children = 0,
-        .num_children_to_expand = 0,
-        .visits = 0,
-        .total_reward = 0,
-        .probability = 0,
-};
+const Node zero_node;
 
 void push_node(Node **buf, uintptr_t *len, uintptr_t *cap, Node n) {
-    // allocate more free space if needed
     if (*len >= *cap) {
         if (*cap == 0) {
             *cap = 1024;
@@ -221,7 +206,6 @@ void push_node(Node **buf, uintptr_t *len, uintptr_t *cap, Node n) {
 }
 
 void push_command(Command **buf, uintptr_t *len, uintptr_t *cap, Command command) {
-    // allocate more free space if needed
     if (*len >= *cap) {
         if (*cap == 0) {
             *cap = 1024;
@@ -234,7 +218,7 @@ void push_command(Command **buf, uintptr_t *len, uintptr_t *cap, Command command
     *len += 1;
 }
 
-MCTSState ai_mcts_state_init(Game *game, CommandSlice commands) {
+MCTSState ai_mcts_state_init(Game *game, Command *commands, int num_commands) {
     Node *nodes = NULL;
     uintptr_t nodes_len = 0;
     uintptr_t nodes_cap = 0;
@@ -247,7 +231,7 @@ MCTSState ai_mcts_state_init(Game *game, CommandSlice commands) {
             .parent_i = 0,
             .first_child_i = 0,
             .num_children = 0,
-            .num_children_to_expand = (uint32_t) commands.len,
+            .num_children_to_expand = (uint32_t) num_commands,
             .visits = 0,
             .total_reward = 0,
             .probability = 1.0,
@@ -270,9 +254,7 @@ void ai_mcts_state_cleanup(MCTSState *state) {
     }
 }
 
-void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iterations) {
-    Arena *scratch = scratch_acquire();
-
+void ai_mcts_think(MCTSState *state, Game *game, Command *commands, int num_commands, int iterations) {
     Node *nodes = state->nodes;
     uintptr_t nodes_len = state->nodes_len;
     uintptr_t nodes_cap = state->nodes_cap;
@@ -287,18 +269,18 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
     double dpw_k = 1.0; // @note: tuneable
     double dpw_alpha = 0.5;
 
-    //uint32_t passes = 100 * (uint32_t) commands.len + 1;
+    Command *new_commands = malloc(1024 * sizeof(*new_commands));
+    int num_new_commands = 0;
+
     for (int pass = 0; pass < iterations; pass++) {
-        // Selection
         uint32_t node_i = root_i;
-        //while (nodes[node_i].kind != NODE_OVER && nodes[node_i].num_children_to_expand == 0) {
         while (true) {
             if (nodes[node_i].kind == NODE_OVER) {
                 break;
             }
 
             if (nodes[node_i].kind == NODE_CHANCE) {
-                double r = (double) rand() / RAND_MAX;  // random value in [0,1)
+                double r = (double) rand() / RAND_MAX;
                 double cumulative = 0.0;
                 uint32_t child_i = 0;
                 assert(nodes[node_i].num_children == 2);
@@ -353,40 +335,42 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
                 assert(nodes_len == nodes[node_i].first_child_i + nodes[node_i].num_children_to_expand);
             }
 
-            CommandSlice node_commands = game_valid_commands(scratch, &nodes[node_i].game);
-            assert(node_commands.len == nodes[node_i].num_children_to_expand + nodes[node_i].num_children);
+            num_new_commands = game_valid_commands(&(new_commands[0]), 1024, &nodes[node_i].game);
+            assert((uint32_t) num_new_commands == nodes[node_i].num_children_to_expand + nodes[node_i].num_children);
             unexpanded_commands_len = 0;
-            for (uint64_t i = 0; i < node_commands.len; i++) {
+            for (int i = 0; i < num_new_commands; i++) {
                 bool found = false;
                 for (uint32_t j = 0; j < nodes[node_i].num_children; j++) {
                     uint32_t child_i = nodes[node_i].first_child_i + j;
-                    if (command_eq(node_commands.e[i], nodes[child_i].command)) {
+                    if (command_eq(new_commands[i], nodes[child_i].command)) {
                         found = true;
                         break;
                     }
                 }
                 if (!found) {
                     push_command(&unexpanded_commands, &unexpanded_commands_len, &unexpanded_commands_cap,
-                                 node_commands.e[i]);
+                                 new_commands[i]);
                 }
             }
             assert(unexpanded_commands_len > 0);
             Command child_command = ai_select_command_heuristic(&nodes[node_i].game,
-                                                                (CommandSlice) {.len = unexpanded_commands_len,
-                                                                        .e = unexpanded_commands});
+                                                                unexpanded_commands,
+                                                                (int) unexpanded_commands_len);
 
             uint32_t next_child_i = nodes[node_i].first_child_i + nodes[node_i].num_children;
             Game child_game = nodes[node_i].game;
 
             if (child_command.kind == COMMAND_VOLLEY) {
                 Game hit_game = child_game;
-                Game miss_game = child_game;
                 game_apply_command(&hit_game, hit_game.turn.player, child_command, VOLLEY_HIT);
-                game_apply_command(&miss_game, miss_game.turn.player, child_command, VOLLEY_MISS);
-                CommandSlice hit_next_commands = game_valid_commands(scratch, &hit_game);
-                CommandSlice miss_next_commands = game_valid_commands(scratch, &miss_game);
+                int num_new_hit_commands = game_valid_commands(&(new_commands[0]), 1024, &hit_game);
 
                 uint32_t hit_child_i = (uint32_t) nodes_len;
+
+                Game miss_game = child_game;
+                game_apply_command(&miss_game, miss_game.turn.player, child_command, VOLLEY_MISS);
+                int num_new_miss_commands = game_valid_commands(&(new_commands[0]), 1024, &miss_game);
+
                 uint32_t miss_child_i = hit_child_i + 1;
 
                 nodes[next_child_i] = (Node) {
@@ -411,7 +395,7 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
                         .parent_i = next_child_i,
                         .first_child_i = 0,
                         .num_children = 0,
-                        .num_children_to_expand = (uint32_t) hit_next_commands.len,
+                        .num_children_to_expand = (uint32_t) num_new_hit_commands,
                         .visits = 0,
                         .total_reward = 0,
                         .probability = 0.4167,
@@ -423,16 +407,15 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
                         .parent_i = next_child_i,
                         .first_child_i = 0,
                         .num_children = 0,
-                        .num_children_to_expand = (uint32_t) miss_next_commands.len,
+                        .num_children_to_expand = (uint32_t) num_new_miss_commands,
                         .visits = 0,
                         .total_reward = 0,
                         .probability = 1 - 0.4167,
                 });
-                nodes_to_simulate[0] = hit_child_i;
                 nodes_to_simulate[1] = miss_child_i;
             } else {
                 game_apply_command(&child_game, child_game.turn.player, child_command, VOLLEY_ROLL);
-                CommandSlice next_commands = game_valid_commands(scratch, &child_game);
+                num_commands = game_valid_commands(&(new_commands[0]), 1024, &child_game);
 
                 nodes[next_child_i] = (Node) {
                         .kind = child_game.status == STATUS_OVER ? NODE_OVER : NODE_DECISION,
@@ -441,7 +424,7 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
                         .parent_i = node_i,
                         .first_child_i = 0,
                         .num_children = 0,
-                        .num_children_to_expand = (uint32_t) next_commands.len,
+                        .num_children_to_expand = (uint32_t) num_commands,
                         .visits = 0,
                         .total_reward = 0,
                         .probability = 1.0,
@@ -498,11 +481,10 @@ void ai_mcts_think(MCTSState *state, Game *game, CommandSlice commands, int iter
     if (unexpanded_commands != NULL) {
         free(unexpanded_commands);
     }
-
-    scratch_release();
+    free(new_commands);
 }
 
-Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice commands) {
+Command ai_mcts_select_command(MCTSState *state, Game *game, Command *commands, int num_commands) {
     Node *nodes = state->nodes;
     uint32_t root_i = state->root;
 
@@ -511,7 +493,7 @@ Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice comman
     uint32_t best_child_i = 0;
 
     assert(nodes[root_i].num_children > 0);
-    assert(nodes[root_i].num_children == commands.len);
+    assert(nodes[root_i].num_children == (uint32_t) num_commands);
     assert(nodes[root_i].num_children_to_expand == 0);
     for (uint32_t i = 0; i < nodes[root_i].num_children; i++) {
         uint32_t child_i = nodes[root_i].first_child_i + i;
@@ -525,35 +507,34 @@ Command ai_mcts_select_command(MCTSState *state, Game *game, CommandSlice comman
     return result;
 }
 
-int ai_test(void) {
-    for (int g = 0; g < 10; g++) {
-        printf("game %d\n", g);
-        MCTSState ai_state = {0};
-
-        Game game = {0};
-        game_init_attrition_hex_field_small(&game);
-
-        
-        while (game.status == STATUS_IN_PROGRESS) {
-            Arena *scratch = scratch_acquire();
-            CommandSlice commands = game_valid_commands(scratch, &game);
-
-            Command command;
-            if (game.turn.player == PLAYER_RED) {
-                command = ai_select_command_heuristic(&game, commands);
-                //command = ai_select_command_uniform_rollouts(&game, commands);
-            } else {
-                command = ai_select_command_heuristic(&game, commands);
-                //command = ai_select_command_uniform_rollouts(&game, commands);
-                //command = ai_select_command_mcts(&ai_state, &game, commands);
-            }
-            game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
-            scratch_release();
-        }
-        printf("winner %s\n", game.winner == PLAYER_RED ? "red" : "blue");
-        scratch_free();
-    }
-
-    return 0;
-}
-
+//int ai_test(void) {
+//    for (int g = 0; g < 10; g++) {
+//        printf("game %d\n", g);
+//        MCTSState ai_state = {0};
+//
+//        Game game = {0};
+//        game_init_attrition_hex_field_small(&game);
+//
+//
+//        while (game.status == STATUS_IN_PROGRESS) {
+//            Arena *scratch = scratch_acquire();
+//            CommandSlice commands = game_valid_commands(scratch, &game);
+//
+//            Command command;
+//            if (game.turn.player == PLAYER_RED) {
+//                command = ai_select_command_heuristic(&game, commands);
+//                //command = ai_select_command_uniform_rollouts(&game, commands);
+//            } else {
+//                command = ai_select_command_heuristic(&game, commands);
+//                //command = ai_select_command_uniform_rollouts(&game, commands);
+//                //command = ai_select_command_mcts(&ai_state, &game, commands);
+//            }
+//            game_apply_command(&game, game.turn.player, command, VOLLEY_ROLL);
+//            scratch_release();
+//        }
+//        printf("winner %s\n", game.winner == PLAYER_RED ? "red" : "blue");
+//        scratch_free();
+//    }
+//
+//    return 0;
+//}
