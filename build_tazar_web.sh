@@ -7,7 +7,7 @@ pushd cmake-web
 mv tazar.html index.html
 mkdir tazar-web
 cp tazar.js tazar-web/
-cp azar.wasm tazar-web/
+cp tazar.wasm tazar-web/
 cp index.html tazar-web/
 zip -r tazar-web.zip tazar-web
 popd
