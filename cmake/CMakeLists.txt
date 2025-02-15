@@ -20,8 +20,8 @@ endif ()
 # * On MacOS need environment variable set MallocNanoZone=0
 #   or you'll get a warning with asan in stdlib code.
 if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Windows") AND (CMAKE_C_COMPILER_ID STREQUAL "Clang") AND (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-    #target_compile_options(compile-options INTERFACE -fsanitize=address -fno-omit-frame-pointer)
-    #target_link_options(compile-options INTERFACE -fsanitize=address)
+    target_compile_options(compile-options INTERFACE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(compile-options INTERFACE -fsanitize=address)
 endif ()
 
 enable_testing()
@@ -50,27 +50,38 @@ if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "
 endif ()
 
 # Raylib stuff is only working for a few platforms right now.
-if ((NOT ((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"))))
-    include(FetchContent)
-    set(FETCHCONTENT_QUIET FALSE)
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
-    set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
-    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-    set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
+#if ((NOT ((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"))))
+#    include(FetchContent)
+#    set(FETCHCONTENT_QUIET FALSE)
+#    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
+#    set(BUILD_GAMES OFF CACHE BOOL "" FORCE) # don't build the supplied example games
+#    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+#    set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
+#
+#    FetchContent_Declare(
+#            raylib
+#            GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
+#            GIT_TAG "master"
+#            GIT_PROGRESS TRUE
+#    )
+#    FetchContent_MakeAvailable(raylib)
+#
+#    #if (EMSCRIPTEN)
+#    #    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -s ALLOW_MEMORY_GROWTH")
+#    #    set(CMAKE_EXECUTABLE_SUFFIX ".html")
+#    #endif ()
+#
+#    add_executable(tazar-v1 ../tazar-v1/tazar_game.c ../tazar-v1/tazar_ai.c ../tazar-v1/tazar_ui.c ../tazar-v1/tazar_main.c)
+#    target_link_libraries(tazar-v1 PRIVATE compile-options raylib)
+#endif ()
 
-    FetchContent_Declare(
-            raylib
-            GIT_REPOSITORY "https://github.com/raysan5/raylib.git"
-            GIT_TAG "master"
-            GIT_PROGRESS TRUE
-    )
-    FetchContent_MakeAvailable(raylib)
-    
-    #if (EMSCRIPTEN)
-    #    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -s ALLOW_MEMORY_GROWTH")
-    #    set(CMAKE_EXECUTABLE_SUFFIX ".html")
-    #endif ()
+add_executable(tazar-test ../tazar/tazar_game.c ../tazar/tazar_ai.c ../tazar/tazar_test.c)
+target_link_libraries(tazar-test PRIVATE compile-options)
 
-    add_executable(tazar-v1 ../tazar-v1/tazar_game.c ../tazar-v1/tazar_ai.c ../tazar-v1/tazar_ui.c ../tazar-v1/tazar_main.c)
-    target_link_libraries(tazar-v1 PRIVATE compile-options raylib)
+if (EMSCRIPTEN)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ASSERTIONS=1 -s WASM=1 -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS=\"['_tazar_ai']\" -s EXPORTED_RUNTIME_METHODS=ccall,cwrap")
+    add_executable(tazar-wasm ../tazar/tazar_game.c ../tazar/tazar_ai.c ../tazar/tazar_wasm.c)
+    target_link_libraries(tazar-wasm PRIVATE compile-options)
+    configure_file(../tazar/index.html index.html COPYONLY)
+    configure_file(../tazar/tazar.js tazar.js COPYONLY)
 endif ()
