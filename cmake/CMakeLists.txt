@@ -50,8 +50,7 @@ if (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_C_COMPILER_ID MATCHES "
 endif ()
 
 # Raylib stuff is only working for a few platforms right now.
-
-if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (NOT ((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"))))
+if ((NOT ((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"))))
     include(FetchContent)
     set(FETCHCONTENT_QUIET FALSE)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
@@ -66,15 +65,12 @@ if ((NOT CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (NOT ((CMAKE_SYSTEM_NAME STREQU
             GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(raylib)
+    
+    #if (EMSCRIPTEN)
+    #    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -s ALLOW_MEMORY_GROWTH")
+    #    set(CMAKE_EXECUTABLE_SUFFIX ".html")
+    #endif ()
 
-    if (EMSCRIPTEN)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -s ALLOW_MEMORY_GROWTH")
-        set(CMAKE_EXECUTABLE_SUFFIX ".html")
-    endif ()
-
-    add_executable(tazar ../tazar/tazar_game.c ../tazar/tazar_ai.c ../tazar/tazar_ui.c ../tazar/tazar_main.c)
-    target_link_libraries(tazar PRIVATE compile-options raylib)
+    add_executable(tazar-v1 ../tazar-v1/tazar_game.c ../tazar-v1/tazar_ai.c ../tazar-v1/tazar_ui.c ../tazar-v1/tazar_main.c)
+    target_link_libraries(tazar-v1 PRIVATE compile-options raylib)
 endif ()
-
-#add_library(bestline ../3rdparty/bestline/bestline.c)
-#target_link_libraries(tazar compile-options bestline)

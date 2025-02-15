@@ -334,7 +334,7 @@ int move_targets(CPos *targets, int max_targets, Game *game, CPos from) {
             // we don't keep checking and not continuing from the same pieces over and over.
             // The problem with that, is that we don't want to go through walls. So we'd have to check
             // neighbors anyway to find one that is in visited. Is that faster than this? I think so.
-            // eh, I'm not sure actually.
+            // eh, I'm not sure, actually.
             CPos neighbors[6] = {
                     cpos_add(current, CPOS_RIGHT_UP),
                     cpos_add(current, CPOS_RIGHT),
