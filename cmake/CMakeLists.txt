@@ -85,3 +85,5 @@ if (EMSCRIPTEN)
     configure_file(../tazar/index.html index.html COPYONLY)
     configure_file(../tazar/tazar.js tazar.js COPYONLY)
 endif ()
+
+# new project
