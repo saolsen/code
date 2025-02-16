@@ -4,5 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef struct {
+
+} Game;
 
 #endif // TAZAR_H
