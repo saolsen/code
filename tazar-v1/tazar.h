@@ -1,6 +1,8 @@
 #ifndef TAZAR_H
 #define TAZAR_H
 
+// need to fix the web shell
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -125,7 +127,6 @@ bool command_eq(Command a, Command b);
 
 int game_valid_commands(Command *buf, int max_commands, Game *game);
 
-
 typedef enum {
     VOLLEY_ROLL,
     VOLLEY_HIT,
@@ -134,16 +135,13 @@ typedef enum {
 
 void game_apply_command(Game *game, Player player, Command command, VolleyResult volley_result);
 
-
 Command ai_select_command_heuristic(Game *game, Command *commands, int num_commands);
-
 
 typedef struct {
     double *scores;
     int *passes;
     int i;
 } MCState;
-
 
 MCState ai_mc_state_init(Game *game, Command *commands, int num_commands);
 
@@ -152,7 +150,6 @@ void ai_mc_state_cleanup(MCState *state);
 void ai_mc_think(MCState *state, Game *game, Command *commands, int num_commands, int iterations);
 
 Command ai_mc_select_command(MCState *state, Game *game, Command *commands, int num_commands);
-
 
 typedef enum {
     NODE_NONE,
@@ -185,10 +182,10 @@ MCTSState ai_mcts_state_init(Game *game, Command *commands, int num_commands);
 
 void ai_mcts_state_cleanup(MCTSState *state);
 
-void ai_mcts_think(MCTSState *state, Game *game, Command *commands, int num_commands, int iterations);
+void ai_mcts_think(MCTSState *state, Game *game, Command *commands, int num_commands,
+                   int iterations);
 
 Command ai_mcts_select_command(MCTSState *state, Game *game, Command *commands, int num_commands);
-
 
 int ai_test(void);
 

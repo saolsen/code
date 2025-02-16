@@ -1,13 +1,13 @@
 #!/bin/bash
 
-pushd cmake
+pushd cmake || exit
 emcmake cmake -S . -B cmake-web -DCMAKE_BUILD_TYPE=Release
-cmake --build cmake-web --target tazar
-pushd cmake-web
-mv tazar.html index.html
+cmake --build cmake-web --target tazar-v1
+pushd cmake-web || exit
+mv tazar-v1.html index.html
 mkdir tazar-web
-cp tazar.js tazar-web/
-cp tazar.wasm tazar-web/
+cp tazar-v1.js tazar-web/
+cp tazar-v1.wasm tazar-web/
 cp index.html tazar-web/
 zip -r tazar-web.zip tazar-web
-popd
+popd || exit
